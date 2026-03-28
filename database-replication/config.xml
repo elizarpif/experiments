@@ -1,0 +1,25 @@
+<clickhouse>
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+    <remote_servers>
+        <cluster_1s_2r>
+            <shard>
+                <replica>
+                    <host>ch-node1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch-node2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </cluster_1s_2r>
+    </remote_servers>
+    <macros>
+        <shard>01</shard>
+        <replica>auto</replica> </macros>
+</clickhouse>

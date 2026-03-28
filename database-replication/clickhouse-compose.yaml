@@ -1,0 +1,37 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: zookeeper:3.7
+    container_name: zookeeper
+    hostname: zookeeper
+
+  clickhouse1:
+    image: clickhouse/clickhouse-server:latest
+    container_name: ch-node1
+    hostname: ch-node1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    depends_on:
+      - zookeeper
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    volumes:
+      - ./config.xml:/etc/clickhouse-server/config.d/macros.xml
+
+  clickhouse2:
+    image: clickhouse/clickhouse-server:latest
+    container_name: ch-node2
+    hostname: ch-node2
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    depends_on:
+      - zookeeper
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    volumes:
+      - ./config.xml:/etc/clickhouse-server/config.d/macros.xml
