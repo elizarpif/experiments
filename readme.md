@@ -10,11 +10,11 @@ experiments/
 └── rate-limiter
 ```
 
-## Subdirectories
+### database-replication
 
-- **`/data/`** - Raw and processed datasets
-- **`/src/`** - Source code and scripts
-- **`/results/`** - Experiment outputs and findings
-- **`/docs/`** - Documentation and notes
-- **`/config/`** - Configuration files
+Testing CAP-theorem scenarios for Postgres and Clickhouse
+
+### rate-limiter
+
+A simple realization of rate-limiter in Go with Redis and nginx.
 
