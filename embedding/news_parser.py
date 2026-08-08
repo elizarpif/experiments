@@ -2,18 +2,14 @@ import os
 import json
 import time
 import logging
-import random
 from datetime import datetime, timedelta, timezone
 
 import asyncio
-import os
 import glob
-from datetime import datetime
 
 import requests
 from bs4 import BeautifulSoup
 import torch
-import pandas as pd
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -25,34 +21,27 @@ logging.basicConfig(
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-# В боте:
+
 ASSETS_DIR = "/Users/elizavetapivovarova/Documents/experiments/embedding/assets"
 
 import openai
-# Настройка клиента внутри парсера
 client = openai.AsyncOpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
+
 class NewsGetter:
-    def __init__(self, base_dir, base_name="news_2026-08-08"):
+    def __init__(self, base_dir, base_name="news"):
         self.base_dir = base_dir
         self.base_name = base_name
-        # Файл по умолчанию
         self.cache_file = os.path.join(self.base_dir, f"{self.base_name}.json")
         self.llm_cache = {}
-
-        """
-        Инициализация класса. Модели загружаются ОДИН раз при запуске бота.
-        """
 
         self.device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
         logging.info(f"Инициализация NewsGetter. Устройство: {self.device}")
 
-        # 1. Загрузка модели суммаризации
         logging.info("Загрузка модели суммаризации (T5)...")
         self.sum_tokenizer = T5Tokenizer.from_pretrained("IlyaGusev/rut5_base_sum_gazeta")
         self.sum_model = T5ForConditionalGeneration.from_pretrained("IlyaGusev/rut5_base_sum_gazeta").to(self.device)
 
-        # 2. Загрузка моделей эмбеддингов и логики
         logging.info("Загрузка моделей для кластеризации (MiniLM, CrossEncoder)...")
         self.dense_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
         self.cross_model = CrossEncoder("cointegrated/rubert-base-cased-nli-threeway")
@@ -63,7 +52,7 @@ class NewsGetter:
         cache_key = tuple(sorted(cluster_ids))
         if cache_key in self.llm_cache:
             return self.llm_cache[cache_key]
-            
+
         combined_text = "\n\n".join([t[:300] for t in texts])
         prompt = f"Ты новостной редактор. Напиши ОДНО предложение о сути события: {combined_text}"
 
@@ -76,9 +65,9 @@ class NewsGetter:
             fact = response.choices[0].message.content.strip()
             self.llm_cache[cache_key] = fact
             return fact
-        except Exception as e:
+        except Exception:
             return "Суть не определена."
-        
+
     # --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ---
     def _fetch_with_retry(self, url, headers, max_retries=3):
         for attempt in range(max_retries):
@@ -111,7 +100,7 @@ class NewsGetter:
     def get_summary(self, text, max_length=90):
         if len(text) < 450:
             return text
-        
+
         inputs = self.sum_tokenizer(
             [text],
             max_length=500,
@@ -136,37 +125,39 @@ class NewsGetter:
         headers = {"User-Agent": "Mozilla/5.0"}
         posts = []
         seen_texts = set()
-        
+
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours) if hours > 0 else None
         logging.info(f"[{channel_username}] Собираем посты за последние {hours} ч...")
-        
+
         current_url = f"https://t.me/s/{channel_username}"
-        
+
         while current_url:
             resp = self._fetch_with_retry(current_url, headers)
-            if not resp: break
-                
+            if not resp:
+                break
+
             soup = BeautifulSoup(resp.text, "html.parser")
             messages = soup.select("div.tgme_widget_message_wrap")
-            if not messages: break
-                
+            if not messages:
+                break
+
             page_posts = []
             reached_cutoff = False
             current_group_date = None
             current_group_id = None
-            
+
             for msg in reversed(messages):
                 text_block = msg.select_one("div.tgme_widget_message_text")
                 raw_text = text_block.get_text(" ", strip=True) if text_block else ""
                 clean_text = " ".join(raw_text.split())
-                
+
                 link_el = msg.select_one("a.tgme_widget_message_date")
                 post_url = link_el["href"] if link_el else None
                 post_id = post_url.rstrip("/").split("/")[-1] if post_url else None
-                
+
                 date_el = msg.select_one("time")
                 post_date = None
-                
+
                 if date_el and date_el.has_attr("datetime"):
                     post_date = datetime.fromisoformat(date_el["datetime"])
                     current_group_date = post_date
@@ -176,18 +167,17 @@ class NewsGetter:
                     if not post_id:
                         post_id = current_group_id
                         post_url = f"https://t.me/{channel_username}/{post_id}" if post_id else None
-                
+
                 if cutoff_time and post_date and post_date < cutoff_time:
                     reached_cutoff = True
-                    break 
-                        
+                    break
+
                 if clean_text and clean_text not in seen_texts:
                     seen_texts.add(clean_text)
                     final_url = post_url if post_url else f"https://t.me/{channel_username}/{post_id}"
 
-                    # Генерируем саммари (сработает быстро для коротких, чуть дольше для длинных)
                     summary = self.get_summary(clean_text)
-                    
+
                     page_posts.append({
                         "text": clean_text,
                         "summary": summary,
@@ -196,12 +186,12 @@ class NewsGetter:
                         "date": post_date.isoformat() if post_date else None,
                         "channel": channel_username,
                     })
-            
+
             posts.extend(reversed(page_posts))
-            
+
             if reached_cutoff or hours == 0:
-                break 
-                
+                break
+
             first_msg = messages[0]
             first_link = first_msg.select_one("a.tgme_widget_message_date")
             if first_link:
@@ -209,7 +199,7 @@ class NewsGetter:
                 current_url = f"https://t.me/s/{channel_username}?before={oldest_id_on_page}"
             else:
                 break
-                
+
         return posts
 
     def save_posts(self, new_posts):
@@ -221,7 +211,7 @@ class NewsGetter:
 
         existing_urls = {p["url"] for p in posts}
         unique_new_posts = [p for p in new_posts if p["url"] not in existing_urls]
-        
+
         if unique_new_posts:
             with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(posts + unique_new_posts, f, ensure_ascii=False, indent=4)
@@ -248,18 +238,18 @@ class NewsGetter:
         logging.info("Вычисление Dense-эмбеддингов (MiniLM)...")
         dense_embeddings = self.dense_model.encode(texts)
         sim_dense = cosine_similarity(dense_embeddings)
-        
+
         logging.info("Вычисление Sparse-эмбеддингов (TF-IDF)...")
-        ru_stop_words = ["а", "в", "г", "да", "для", "до", "ее", "еще", "же", "за", 
-                         "и", "из", "или", "как", "на", "не", "о", "об", "от", "по", 
+        ru_stop_words = ["а", "в", "г", "да", "для", "до", "ее", "еще", "же", "за",
+                         "и", "из", "или", "как", "на", "не", "о", "об", "от", "по",
                          "при", "с", "у", "что", "это", "этот", "к", "но", "то", "так"]
         sparse_model = TfidfVectorizer(stop_words=ru_stop_words)
         sparse_embeddings = sparse_model.fit_transform(texts)
         sim_sparse = cosine_similarity(sparse_embeddings)
-        
+
         logging.info("Объединение матриц (Hybrid Search)...")
         sim_matrix = (alpha * sim_dense) + ((1 - alpha) * sim_sparse)
-        
+
         used_indices = set()
         clusters = []
 
@@ -268,26 +258,31 @@ class NewsGetter:
         contradiction_idx = 2
         for idx, label in id2label.items():
             if 'contradiction' in label.lower():
-                contradiction_idx = idx
+                # ИСПРАВЛЕНО (п.6): id2label может отдавать строковые ключи после
+                # сериализации конфига — приводим явно к int, иначе
+                # probs[contradiction_idx] упадёт с TypeError на индексации тензора.
+                contradiction_idx = int(idx)
                 break
 
         for i in range(len(texts)):
-            if i in used_indices: continue
-                
+            if i in used_indices:
+                continue
+
             current_cluster = [(i, 1.0)]
-            current_outliers = [] # Сюда складываем противоречивые/спорные новости
+            current_outliers = []  # Сюда складываем противоречивые/спорные новости
             used_indices.add(i)
             channels_in_cluster = {posts[i].get('channel')}
-            
+
             for j in range(i + 1, len(texts)):
-                if j in used_indices: continue
-                
+                if j in used_indices:
+                    continue
+
                 score = float(sim_matrix[i][j])
-                
+
                 date_i = posts[i].get('date')
                 date_j = posts[j].get('date')
-                time_diff_hours = 0.0 
-                
+                time_diff_hours = 0.0
+
                 if date_i and date_j:
                     try:
                         di = datetime.fromisoformat(date_i.replace('Z', '+00:00'))
@@ -295,108 +290,114 @@ class NewsGetter:
                         time_diff_hours = abs((di - dj).total_seconds()) / 3600.0
                     except Exception:
                         pass
-                
+
                 if score >= similarity_threshold and time_diff_hours <= 5:
-                    # Чистим тексты от мусора и проверяем логику через Cross-Encoder
                     text_a_short = self._clean_text_for_nli(posts[i].get('summary') or posts[i]['text'])
                     text_b_short = self._clean_text_for_nli(posts[j].get('summary') or posts[j]['text'])
 
                     logits = self.cross_model.predict([(text_a_short, text_b_short)], convert_to_tensor=True)
                     probs = torch.softmax(logits, dim=-1)[0]
                     contradiction_prob = float(probs[contradiction_idx])
-                    
-                    # ЕСЛИ ОБНАРУЖЕНО ПРОТИВОРЕЧИЕ — УБИРАЕМ В OUTLIERS
+
                     if contradiction_prob > contradiction_threshold:
                         current_outliers.append((j, score, contradiction_prob))
-                        logging.debug(f"[Cross-Encoder Outlier] Противоречие: {posts[i]['channel']} vs {posts[j]['channel']} ({contradiction_prob*100:.1f}%)")
-                        continue 
-                    
-                    # ЕСЛИ ВСЁ ХОРОШО — ДОБАВЛЯЕМ В ОСНОВНОЙ КЛАСТЕР
+                        # ИСПРАВЛЕНО (п.5, регрессия): пост-outlier тоже нужно
+                        # пометить использованным. Раньше эта строка отсутствовала —
+                        # пост, отсеянный как противоречащий, на следующей итерации
+                        # внешнего цикла (i дойдёт до j) сам становился источником
+                        # нового, по сути дублирующего кластера.
+                        used_indices.add(j)
+                        logging.debug(
+                            f"[Cross-Encoder Outlier] Противоречие: "
+                            f"{posts[i]['channel']} vs {posts[j]['channel']} ({contradiction_prob*100:.1f}%)"
+                        )
+                        continue
+
                     channel_j = posts[j].get('channel')
                     if channel_j in channels_in_cluster:
-                        # Дубликаты из того же канала игнорируем для основного списка
-                        continue 
-                        
+                        # ИСПРАВЛЕНО (п.5, тот же класс бага): дубликат из уже
+                        # представленного в кластере канала не добавляем в основной
+                        # список, но ОБЯЗАТЕЛЬНО помечаем used — иначе он тоже
+                        # всплывёт как источник нового кластера позже.
+                        used_indices.add(j)
+                        continue
+
                     current_cluster.append((j, score))
                     used_indices.add(j)
                     channels_in_cluster.add(channel_j)
-                    
-            # Сохраняем кластер только если в нем больше 1 новости
+
             if len(current_cluster) > 1:
                 clusters.append({
                     "items": current_cluster,
                     "outliers": current_outliers
                 })
- 
-        clusters.sort(key=lambda x: len(x["items"]), reverse=True)
+
+        clusters.sort(key=lambda c: len(c["items"]), reverse=True)
         return clusters
-    
+
     def get_today_filename(self):
-        """Возвращает ПОЛНЫЙ путь к файлу с датой"""
         current_date = datetime.now().strftime("%Y-%m-%d")
         return os.path.join(self.base_dir, f"{self.base_name}_{current_date}.json")
 
     def get_latest_filename(self):
-        """Находит самый свежий файл в папке self.base_dir"""
         search_pattern = os.path.join(self.base_dir, f"{self.base_name}_*.json")
         files = glob.glob(search_pattern)
         return max(files) if files else self.get_today_filename()
 
     def save_clusters(self, clusters, filename):
-        # Если пришел просто кусок имени (например, clusters_2026-08-08.json), 
-        # объединяем его с базовой папкой
         full_path = os.path.join(self.base_dir, filename) if not os.path.isabs(filename) else filename
         with open(full_path, "w", encoding="utf-8") as f:
             json.dump(clusters, f, ensure_ascii=False, indent=4)
 
     def load_clusters(self, filename):
-        """Загружает готовые сюжеты"""
         full_path = os.path.join(self.base_dir, filename) if not os.path.isabs(filename) else filename
-
-        if not os.path.exists(full_path): return None
+        if not os.path.exists(full_path):
+            return None
         with open(full_path, "r", encoding="utf-8") as f:
             return json.load(f)
-        
+
     # --- МЕТОД ДЛЯ УДОБНОГО ВЫЗОВА ИЗ БОТА ---
     def process_news(self, channels, hours=24, scrape_new=True):
-        """
-        Главный метод-оркестратор. Собирает всё воедино.
-        Идеально подходит для вызова из Telegram-бота.
-        """
-        # ЕСЛИ СОБИРАЛИ НОВЫЕ НОВОСТИ - ПЕРЕСЧИТЫВАЕМ КЛАСТЕРЫ
         if scrape_new:
-            # Парсим, сохраняем в файл текущего дня
             all_new_posts = []
             for channel in channels:
                 all_new_posts.extend(self.get_channel_posts(channel, hours))
             self.save_posts(all_new_posts)
-            
-            # Считаем кластеры
+
             all_posts = self.load_posts()
             clusters = self.find_news_clusters(all_posts)
-            
-            # 3. ГЕНЕРАЦИЯ ФАКТОВ (Обогащение)
-            # Создаем список для итоговых данных
+
             enriched_data = []
-            
-            # Запускаем цикл генерации фактов через asyncio
+
             loop = asyncio.get_event_loop()
             for cluster in clusters:
-                cluster_texts = [all_posts[idx[0]]['text'] for idx in cluster]
-                fact = loop.run_until_complete(self.get_cluster_fact(cluster_texts))
-                
+                # ИСПРАВЛЕНО (п.3): find_news_clusters теперь возвращает словари
+                # {"items": [...], "outliers": [...]}, а не плоский список кортежей —
+                # нужно явно брать cluster["items"] и распаковывать (idx, score),
+                # а не идти по cluster напрямую (это итерировало бы по ключам
+                # словаря "items"/"outliers").
+                cluster_items = cluster["items"]
+                cluster_indices = [idx for idx, score in cluster_items]
+                cluster_texts = [all_posts[idx]['text'] for idx in cluster_indices]
+
+                # ИСПРАВЛЕНО (п.2): get_cluster_fact ждёт cluster_ids вторым
+                # аргументом (используется как ключ кэша) — раньше вызывалась без
+                # него и падала с TypeError.
+                fact = loop.run_until_complete(
+                    self.get_cluster_fact(cluster_texts, cluster_indices)
+                )
+
                 enriched_data.append({
                     "fact": fact,
-                    "items": cluster
+                    "items": cluster_items,
+                    "outliers": cluster.get("outliers", []),
                 })
-            
-            # 4. Сохраняем уже обогащенный JSON
+
             cluster_file = os.path.basename(self.cache_file).replace("news_", "clusters_")
             self.save_clusters(enriched_data, cluster_file)
             return enriched_data
-        
+
         else:
-            # Просто читаем готовые кластеры
             base_filename = os.path.basename(self.cache_file)
             cluster_filename = base_filename.replace("news_", "clusters_")
             return self.load_clusters(cluster_filename)
@@ -404,31 +405,40 @@ class NewsGetter:
 
 # --- ЗАПУСК ---
 if __name__ == "__main__":
-    # Исправил пропущенную запятую в списке каналов
     CHANNELS = [
-        "mosnews", "ria_novosti_russiya", "readovkanews", 
-        "varlamov_news", "ostorozhno_novosti", "dmitrynikotin", 
+        "mosnews", "ria_novosti_russiya", "readovkanews",
+        "varlamov_news", "ostorozhno_novosti", "dmitrynikotin",
         "bbcrussian", "kommersant"
     ]
-    FILE_NAME = "news_cache.json"
-    SCRAPE_NEW_DATA = False 
+    SCRAPE_NEW_DATA = False
 
-    # 1. Создаем экземпляр (загружаем тяжелые модели в память 1 раз)
-    news_getter = NewsGetter(FILE_NAME)
+    # ИСПРАВЛЕНО (п.1): конструктор ждёт (base_dir, base_name) — раньше сюда
+    # передавалось "news_cache.json" как base_dir, из-за чего cache_file
+    # собирался в несуществующий путь "news_cache.json/news_2026-08-08.json".
+    # base_dir теперь — папка ASSETS_DIR, base_name — имя файла без расширения.
+    news_getter = NewsGetter(base_dir=ASSETS_DIR, base_name="news_cache")
 
-    # 2. Запускаем главный конвейер
     clusters = news_getter.process_news(channels=CHANNELS, hours=24, scrape_new=SCRAPE_NEW_DATA)
-    
-    # 3. Вывод результатов
     all_posts = news_getter.load_posts()
+
     print(f"\n--- НАЙДЕНО СЮЖЕТОВ: {len(clusters)} ---\n")
-    
-    for rank, cluster_items in enumerate(clusters[:15], 1):
-        print(f"📌 СЮЖЕТ #{rank} (Опубликовали каналов: {len(cluster_items)})")
-        for idx, score in cluster_items:
+
+    for rank, cluster in enumerate(clusters[:15], 1):
+        # ИСПРАВЛЕНО (п.4): clusters теперь — список словарей
+        # {"fact": ..., "items": [(idx, score), ...], "outliers": [...]}, а не
+        # плоский список кортежей (idx, score). Раньше
+        # "for idx, score in cluster_items" пыталось распаковать словарь и падало.
+        items = cluster["items"]
+        fact = cluster.get("fact", "")
+
+        print(f"📌 СЮЖЕТ #{rank} (Опубликовали каналов: {len(items)})")
+        if fact:
+            print(f"   Суть: {fact}")
+
+        for idx, score in items:
             post = all_posts[idx]
             snippet = post['text'][:120].replace('\n', ' ') + "..."
-            
+
             if score == 1.0:
                 print(f"  ⭐ [ИСТОЧНИК СЮЖЕТА] | Канал: {post.get('channel')} | {post['url']}")
             else:
