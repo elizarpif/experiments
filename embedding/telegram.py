@@ -208,20 +208,39 @@ def load_posts(filename="posts_cache.json"):
     print(f"\n[OK] Загружено {len(posts)} постов из файла '{filename}'")
     return posts
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 # --- 4. ПОИСК И ГРУППИРОВКА СЮЖЕТОВ ---
-def find_news_clusters(posts, similarity_threshold=0.65):
+def find_news_clusters(posts, alpha = 0.7, similarity_threshold=0.55):
     if len(posts) < 2:
         print("Слишком мало постов для сравнения.")
         return
 
     texts = [p["text"] for p in posts]
     
-    print(f"\nЗагрузка модели и создание эмбеддингов для {len(texts)} постов...")
-    model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
-    embeddings = model.encode(texts)
+    # 1. DENSE (Смысл и синонимы)
+    print(f"\nЗагрузка Dense-модели и создание эмбеддингов для {len(texts)} постов...")
+    dense_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+    dense_embeddings = dense_model.encode(texts)
+    sim_dense = cosine_similarity(dense_embeddings)
     
-    print("Вычисление матрицы похожести...\n")
-    sim_matrix = cosine_similarity(embeddings)
+    # 2. SPARSE (Точные совпадения слов)
+    print("Вычисление Sparse-матрицы (TF-IDF)...")
+    # Добавляем базовые русские стоп-слова
+    ru_stop_words = ["а", "в", "г", "да", "для", "до", "ее", "еще", "же", "за", 
+                     "и", "из", "или", "как", "на", "не", "о", "об", "от", "по", 
+                     "при", "с", "у", "что", "это", "этот", "к", "но", "то", "так"]
+
+    # Используем базовый анализатор. Он даст больший вес редким именам и названиям.
+    sparse_model = TfidfVectorizer(stop_words=ru_stop_words)
+    sparse_embeddings = sparse_model.fit_transform(texts)
+    sim_sparse = cosine_similarity(sparse_embeddings)
+    
+    # 3. HYBRID (Слияние двух миров)
+    print(f"Объединение матриц (Hybrid Search)... alpha={alpha}, similarity={similarity_threshold}")
+    # alpha — это вес Dense-модели. 
+    # 0.6 означает, что итоговая оценка на 60% состоит из смысла и на 40% из точных слов.
+    sim_matrix = (alpha * sim_dense) + ((1 - alpha) * sim_sparse)
     
     used_indices = set()
     clusters = []
@@ -299,7 +318,7 @@ if __name__ == "__main__":
     # ---------------- РЕЖИМ РАБОТЫ ----------------
     # True = парсим Telegram, сохраняем в файл, затем ищем похожее
     # False = НЕ парсим Telegram, просто берем данные из файла и ищем похожее
-    SCRAPE_NEW_DATA = True 
+    SCRAPE_NEW_DATA = False 
 #     SCRAPE_NEW_DATA = False 
     FILE_NAME = "/Users/elizavetapivovarova/Documents/experiments/embedding/assets/news_cache.json"
     # ----------------------------------------------
@@ -331,4 +350,4 @@ if __name__ == "__main__":
     
     if all_posts:
         # Анализируем то, что прочитали из файла
-        find_news_clusters(all_posts, similarity_threshold=0.7)
+        find_news_clusters(all_posts, alpha=0.5, similarity_threshold=0.6)
