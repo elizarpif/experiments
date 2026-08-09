@@ -3,3 +3,6 @@ database-replication/logs
 database-replication/neo4j-compose.yml
 .DS_Store
 .idea/
+embedding/assets
+embedding/results
+.env

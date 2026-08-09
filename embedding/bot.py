@@ -24,9 +24,19 @@ client = openai.AsyncOpenAI(
     api_key="ollama" # Ключ тут не важен, но библиотека требует, чтобы он был не пустой
 )
 
-# Конфигурация
-TOKEN = "8859228373:AAHDJFK4sh1rTneet0MV3MkH46uM5Fs_2Mo"
-DEVELOPER_CHAT_ID = "1306632332"
+import os
+from dotenv import load_dotenv
+
+# Загружаем переменные из файла .env
+load_dotenv()
+
+# Безопасно считываем токен и ID
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+DEVELOPER_CHAT_ID = os.getenv("DEVELOPER_CHAT_ID")
+
+if not TOKEN:
+    raise ValueError("Не найден TELEGRAM_BOT_TOKEN в переменных окружения!")
+
 CHANNELS = [
     "mosnews", "ria_novosti_russiya", "readovkanews", 
     "varlamov_news", "ostorozhno_novosti", "dmitrynikotin", 
