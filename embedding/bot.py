@@ -103,7 +103,7 @@ class NewsBot:
                     logger.info(f"Файл {daily_filename} не найден. Начинаем сбор...")
             
             # Стандартный парсинг (сработает, если базы нет, либо через 24 часа)
-            self.news_app.process_news(CHANNELS, hours=24, scrape_new=True)
+            await self.news_app.process_news(CHANNELS, hours=24, scrape_new=True)
             logger.info("Плановый сбор успешно завершен!")
         except Exception as e:
             logger.error(f"Ошибка при фоновом сборе: {e}")

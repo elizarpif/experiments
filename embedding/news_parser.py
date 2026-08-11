@@ -54,13 +54,24 @@ class NewsGetter:
             return self.llm_cache[cache_key]
 
         combined_text = "\n\n".join([t[:300] for t in texts])
-        prompt = f"Ты новостной редактор. Напиши ОДНО предложение о сути события: {combined_text}"
+        prompt = f"""You are a professional news editor. 
+Your task is to summarize the provided news into ONE clear, grammatically correct Russian sentence.
 
+CRITICAL RULES:
+1. Do NOT mix up numbers, victims, or locations. If information is contradictory, report the most likely scenario or keep it separate.
+2. Grammar must be perfect. Avoid logical errors like "injured died".
+3. DO NOT hallucinate dates or facts.
+4. Language: Russian.
+5. Length: Max 25 words.
+Before writing, check if your sentence makes logical sense (e.g., do not say "injured died").
+Keep the count of victims and nature of the event accurate.
+NEWS:
+{combined_text}"""        
         try:
             response = await client.chat.completions.create(
                 model="qwen2.5:1.5b",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
+                temperature=0.0
             )
             fact = response.choices[0].message.content.strip()
             self.llm_cache[cache_key] = fact
@@ -357,7 +368,7 @@ class NewsGetter:
             return json.load(f)
 
     # --- МЕТОД ДЛЯ УДОБНОГО ВЫЗОВА ИЗ БОТА ---
-    def process_news(self, channels, hours=24, scrape_new=True):
+    async def process_news(self, channels, hours=24, scrape_new=True):
         if scrape_new:
             all_new_posts = []
             for channel in channels:
@@ -369,23 +380,17 @@ class NewsGetter:
 
             enriched_data = []
 
-            loop = asyncio.get_event_loop()
             for cluster in clusters:
-                # ИСПРАВЛЕНО (п.3): find_news_clusters теперь возвращает словари
-                # {"items": [...], "outliers": [...]}, а не плоский список кортежей —
-                # нужно явно брать cluster["items"] и распаковывать (idx, score),
-                # а не идти по cluster напрямую (это итерировало бы по ключам
-                # словаря "items"/"outliers").
+                # find_news_clusters возвращает словари {"items": [...], "outliers": [...]}
                 cluster_items = cluster["items"]
                 cluster_indices = [idx for idx, score in cluster_items]
                 cluster_texts = [all_posts[idx]['text'] for idx in cluster_indices]
+                
+                # Строковые ID для кэша LLM
+                cluster_ids = [str(all_posts[idx].get('id', idx)) for idx in cluster_indices]
 
-                # ИСПРАВЛЕНО (п.2): get_cluster_fact ждёт cluster_ids вторым
-                # аргументом (используется как ключ кэша) — раньше вызывалась без
-                # него и падала с TypeError.
-                fact = loop.run_until_complete(
-                    self.get_cluster_fact(cluster_texts, cluster_indices)
-                )
+                # ИСПОЛЬЗУЕМ AWAIT ВМЕСТО run_until_complete
+                fact = await self.get_cluster_fact(cluster_texts, cluster_ids)
 
                 enriched_data.append({
                     "fact": fact,
@@ -401,7 +406,6 @@ class NewsGetter:
             base_filename = os.path.basename(self.cache_file)
             cluster_filename = base_filename.replace("news_", "clusters_")
             return self.load_clusters(cluster_filename)
-
 
 # --- ЗАПУСК ---
 if __name__ == "__main__":

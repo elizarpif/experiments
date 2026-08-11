@@ -5,8 +5,8 @@ from news_parser import NewsGetter # Импортируем ваш класс
 # НАСТРОЙКИ
 ASSETS_DIR = "/Users/elizavetapivovarova/Documents/experiments/embedding/assets"
 # Укажите имя файла, для которого нужно посчитать сюжеты (или оставьте None, чтобы посчитать для самого свежего)
-FILE_TO_PROCESS = "news_2026-08-09.json" 
-CLUSTER_FILENAME = "clusters_2026-08-09.json"
+FILE_TO_PROCESS = "news_2026-08-10.json" 
+CLUSTER_FILENAME = "clusters_2026-08-10.json"
 
 async def run_calculation():
     # 1. Инициализируем наш парсер
@@ -48,7 +48,7 @@ async def run_calculation():
         # Генерируем факт (вызываем асинхронный метод парсера)
         fact = await getter.get_cluster_fact(cluster_texts, cluster_ids)
         
-        print(f"[{idx}/{len(raw_clusters)}] Сюжет сгенерирован (аутлайеров: {len(outliers)})")
+        print(f"[{idx}/{len(raw_clusters)}] Сюжет сгенерирован (outliers: {len(outliers)})")
         
         # Сохраняем полную структуру в итоговый список
         enriched_clusters.append({
@@ -64,7 +64,7 @@ async def run_calculation():
     getter.save_clusters(enriched_clusters, cluster_filename)
     
     print(f"\n[OK] Готово! Сюжеты, факты и аутлайеры сохранены в {cluster_filename}")
-    
+
 import asyncio
 
 if __name__ == "__main__":

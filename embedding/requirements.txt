@@ -1,0 +1,10 @@
+beautifulsoup4==4.15.0
+openai==2.53.0
+python-dotenv==1.2.2
+python-telegram-bot==22.8
+Requests==2.34.2
+scikit_learn==1.9.0
+sentence_transformers==5.7.0
+torch==2.13.0
+tqdm==4.70.0
+transformers==5.14.1
