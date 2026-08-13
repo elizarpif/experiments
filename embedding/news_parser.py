@@ -22,8 +22,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-ASSETS_DIR = "/Users/elizavetapivovarova/Documents/experiments/embedding/assets"
-
 import openai
 client = openai.AsyncOpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
@@ -406,46 +404,3 @@ NEWS:
             base_filename = os.path.basename(self.cache_file)
             cluster_filename = base_filename.replace("news_", "clusters_")
             return self.load_clusters(cluster_filename)
-
-# --- ЗАПУСК ---
-if __name__ == "__main__":
-    CHANNELS = [
-        "mosnews", "ria_novosti_russiya", "readovkanews",
-        "varlamov_news", "ostorozhno_novosti", "dmitrynikotin",
-        "bbcrussian", "kommersant"
-    ]
-    SCRAPE_NEW_DATA = False
-
-    # ИСПРАВЛЕНО (п.1): конструктор ждёт (base_dir, base_name) — раньше сюда
-    # передавалось "news_cache.json" как base_dir, из-за чего cache_file
-    # собирался в несуществующий путь "news_cache.json/news_2026-08-08.json".
-    # base_dir теперь — папка ASSETS_DIR, base_name — имя файла без расширения.
-    news_getter = NewsGetter(base_dir=ASSETS_DIR, base_name="news_cache")
-
-    clusters = news_getter.process_news(channels=CHANNELS, hours=24, scrape_new=SCRAPE_NEW_DATA)
-    all_posts = news_getter.load_posts()
-
-    print(f"\n--- НАЙДЕНО СЮЖЕТОВ: {len(clusters)} ---\n")
-
-    for rank, cluster in enumerate(clusters[:15], 1):
-        # ИСПРАВЛЕНО (п.4): clusters теперь — список словарей
-        # {"fact": ..., "items": [(idx, score), ...], "outliers": [...]}, а не
-        # плоский список кортежей (idx, score). Раньше
-        # "for idx, score in cluster_items" пыталось распаковать словарь и падало.
-        items = cluster["items"]
-        fact = cluster.get("fact", "")
-
-        print(f"📌 СЮЖЕТ #{rank} (Опубликовали каналов: {len(items)})")
-        if fact:
-            print(f"   Суть: {fact}")
-
-        for idx, score in items:
-            post = all_posts[idx]
-            snippet = post['text'][:120].replace('\n', ' ') + "..."
-
-            if score == 1.0:
-                print(f"  ⭐ [ИСТОЧНИК СЮЖЕТА] | Канал: {post.get('channel')} | {post['url']}")
-            else:
-                print(f"  🔗 [СХОДСТВО: {score*100:.1f}%] | Канал: {post.get('channel')} | {post['url']}")
-            print(f"     Текст: {snippet}\n")
-        print("-" * 70)

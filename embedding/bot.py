@@ -24,6 +24,11 @@ client = openai.AsyncOpenAI(
     api_key="ollama" # Ключ тут не важен, но библиотека требует, чтобы он был не пустой
 )
 
+# Определяем путь к папке, где лежит текущий скрипт
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Путь к папке assets (всегда рядом со скриптом)
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+
 import os
 from dotenv import load_dotenv
 
@@ -64,20 +69,24 @@ class NewsBot:
         
         # 1. Загружаем нейросети
         logger.info("Инициализация NewsGetter...")
-        self.news_app = NewsGetter("/Users/elizavetapivovarova/Documents/experiments/embedding/assets/", "news")
+        self.news_app = NewsGetter(ASSETS_DIR, "news")
 
     # --- ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ ФАЙЛОВ ---
     def get_today_filename(self):
-        """Возвращает имя файла с текущей датой (например: news_2026-08-08.json)"""
+        """Возвращает путь к файлу с текущей датой в папке assets"""
         current_date = datetime.now().strftime("%Y-%m-%d")
-        return f"/Users/elizavetapivovarova/Documents/experiments/embedding/assets/news_{current_date}.json"
+        return os.path.join(ASSETS_DIR, f"news_{current_date}.json")
 
     def get_latest_filename(self):
-        """Находит самый свежий файл новостей в папке"""
-        files = glob.glob("/Users/elizavetapivovarova/Documents/experiments/embedding/assets/news_*.json")
+        """Находит самый свежий файл новостей в папке assets"""
+        # Ищем все файлы news_*.json внутри нашей папки assets
+        search_pattern = os.path.join(ASSETS_DIR, "news_*.json")
+        files = glob.glob(search_pattern)
+        
         if not files:
             return self.get_today_filename()
-        # Так как дата в формате YYYY-MM-DD, обычная сортировка выдаст самый свежий файл
+            
+        # Сортировка по имени отлично работает для формата YYYY-MM-DD
         return max(files)
 
     
