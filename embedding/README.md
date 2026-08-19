@@ -42,3 +42,13 @@
 
 * Модель работает как строгий новостной редактор: она читает тексты источников и формулирует **один сухой факт** без воды, эмоций и упоминания первоисточников.
 * Все результаты кэшируются, а готовые данные сохраняются в файлы-спутники (`clusters_YYYY-MM-DD.json`).
+
+
+# Commands
+```bash
+sudo systemctl start newsbot
+```
+```bash
+sudo journalctl -u newsbot -f
+sudo journalctl -u newsbot -n 50 --no-pager
+```
