@@ -3,56 +3,60 @@
 
 <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
       <title>Lexical Hub — Reader & Vocabulary</title>
       <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-      <!-- Кнопка в шапке рядом с именем -->
-      <div id="authProfileBlock" style="display: flex; align-items: center; gap: 8px;">
-            <button class="btn btn-learn" id="btnSettings" onclick="openApiKeyModal()" style="display: none;">⚙️ API
-                  Ключ</button>
-            <span id="displayUsername" style="font-weight: 600; color: var(--text-muted);"></span>
-            <button class="btn btn-learn" id="btnAuthAction" onclick="handleAuthButtonClick()">Войти</button>
-      </div>
+      <!-- Верхняя панель: Бренд и Профиль -->
+      <header class="app-header">
+            <div class="brand">
+                  <span class="logo-icon">📖</span>
+                  <span class="brand-title">Lexical Hub</span>
+            </div>
 
-      <!-- Модалка ввода ключа -->
-      <div id="apiKeyModal"
-            style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
-            <div
-                  style="background: white; padding: 24px; border-radius: 12px; width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                  <h3 style="margin-top: 0;">🔑 Обновить Gemini API Ключ</h3>
-                  <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
-                        Вставьте ваш ключ.
+            <div id="authProfileBlock" class="user-menu">
+                  <button class="btn btn-ghost" id="btnSettings" onclick="openApiKeyModal()" style="display: none;"
+                        title="Настройка ключа API">⚙️ Ключ</button>
+                  <span id="displayUsername" class="username-badge"></span>
+                  <button class="btn btn-ghost btn-sm" id="btnAuthAction"
+                        onclick="handleAuthButtonClick()">Войти</button>
+            </div>
+      </header>
+
+      <!-- Модальное окно API-ключа (Write-Only) -->
+      <div id="apiKeyModal" class="modal-overlay" style="display: none;">
+            <div class="modal-box">
+                  <h3>🔑 Gemini API Ключ</h3>
+                  <p class="modal-desc">
+                        Вставьте ваш личный ключ. Он сохраняется на сервере и не отображается в интерфейсе.
                   </p>
                   <input type="password" id="inputApiKey" placeholder="AIzaSy..."
                         style="width: 100%; margin-bottom: 16px;">
-                  <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                        <button class="btn btn-learn" onclick="closeApiKeyModal()">Отмена</button>
+                  <div class="modal-actions">
+                        <button class="btn btn-ghost" onclick="closeApiKeyModal()">Отмена</button>
                         <button class="btn btn-primary" onclick="saveApiKey()">Сохранить</button>
                   </div>
             </div>
       </div>
 
-      <!-- Модальное окно Авторизации/Регистрации -->
-      <div id="authModal"
-            style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;">
-            <div
-                  style="background: white; padding: 28px; border-radius: 12px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
-                  <h3 id="authModalTitle" style="margin-top: 0;">Вход в аккаунт</h3>
+      <!-- Модальное окно Входа / Регистрации -->
+      <div id="authModal" class="modal-overlay" style="display: none;">
+            <div class="modal-box">
+                  <h3 id="authModalTitle">Вход в аккаунт</h3>
                   <input type="text" id="authLogin" placeholder="Логин" style="width: 100%; margin-bottom: 10px;">
                   <input type="password" id="authPassword" placeholder="Пароль"
                         style="width: 100%; margin-bottom: 16px;">
                   <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button class="btn btn-primary" id="btnSubmitAuth" onclick="submitAuthForm()">Войти</button>
-                        <button class="btn btn-learn" id="btnToggleAuthMode" onclick="toggleAuthMode()">Создать новый
+                        <button class="btn btn-ghost" id="btnToggleAuthMode" onclick="toggleAuthMode()">Создать новый
                               аккаунт</button>
                   </div>
             </div>
       </div>
 
-      <!-- Всплывающий тултип для выделения -->
+      <!-- Всплывающий тултип для выделения текста -->
       <div id="selectionTooltip" style="display: none; position: absolute; z-index: 1000;">
             <button class="btn btn-primary"
                   style="box-shadow: 0 4px 14px rgba(0,0,0,0.18); padding: 6px 12px; font-size: 12px;"
@@ -61,56 +65,55 @@
             </button>
       </div>
 
-      <!-- Вкладки -->
-      <div class="nav-tabs">
+      <!-- Вкладки приложения -->
+      <nav class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('tab-reader', this)">Чтение и Анализ</button>
-            <button class="tab-btn" onclick="switchTab('tab-vocab', this); loadVocabulary();">📚 Мой Словарик (<span
-                        id="dictCount">0</span>)</button>
-      </div>
+            <button class="tab-btn" onclick="switchTab('tab-vocab', this); loadVocabulary();">
+                  Мой Словарик <span id="dictCount" class="badge">0</span>
+            </button>
+      </nav>
 
       <!-- Вкладка 1: Чтение и Анализ -->
       <div id="tab-reader" class="tab-content active">
-            <div class="reader-controls">
-                  <label><strong>Язык:</strong></label>
-                  <select id="readerLanguage" onchange="onLanguageChange()">
-                        <option value="es">🇪🇸 Испанский</option>
-                        <option value="en">🇬🇧 Английский</option>
-                  </select>
+            <div class="toolbar">
+                  <div class="toolbar-left">
+                        <div class="select-group">
+                              <select id="readerLanguage" onchange="onLanguageChange()">
+                                    <option value="es">🇪🇸 Испанский</option>
+                                    <option value="en">🇬🇧 Английский</option>
+                              </select>
+                        </div>
 
-                  <label style="margin-left: 12px;"><strong>Источник:</strong></label>
-                  <select id="readerSourceSelect" onchange="onReaderSourceSelectChange()" style="max-width: 200px;">
-                        <option value="Общее">Общее</option>
-                  </select>
+                        <div class="select-group">
+                              <select id="readerSourceSelect" onchange="onReaderSourceSelectChange()">
+                                    <option value="Общее">📚 Общее</option>
+                              </select>
+                              <input type="text" id="readerSourceInput" placeholder="Название книги..."
+                                    style="display: none; width: 180px;">
+                              <button class="btn btn-icon" id="btnToggleNewSource" type="button"
+                                    onclick="toggleNewSourceMode()" title="Добавить книгу">+</button>
+                        </div>
 
-                  <input type="text" id="readerSourceInput" placeholder="Название книги"
-                        style="width: 200px; display: none;">
-                  <button class="btn btn-learn" id="btnToggleNewSource" type="button" onclick="toggleNewSourceMode()">+
-                        Новая книга</button>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                  <div class="mode-switch">
-                        <button type="button" id="btnModeEdit" class="mode-btn active" onclick="setReaderMode('edit')">
-                              ✏️ Редактирование
-                        </button>
-                        <button type="button" id="btnModeRead" class="mode-btn" onclick="setReaderMode('read')">
-                              📖 Комфортное чтение
-                        </button>
+                        <div class="segmented-control">
+                              <button type="button" id="btnModeEdit" class="seg-btn active"
+                                    onclick="setReaderMode('edit')">✏️ Текст</button>
+                              <button type="button" id="btnModeRead" class="seg-btn" onclick="setReaderMode('read')">📖
+                                    Чтение</button>
+                        </div>
                   </div>
 
-                  <button class="btn btn-primary" onclick="analyzeText()">⚡ Разобрать текст (NLP)</button>
+                  <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="analyzeText()">⚡ Разобрать текст (NLP)</button>
+                  </div>
             </div>
 
-            <!-- Область текста: либо ввод, либо читалка с карточками -->
+            <!-- Область текста -->
             <div id="textContainer">
-                  <!-- 1. Режим редактирования: только поле ввода -->
                   <textarea id="inputText" placeholder="Вставьте главу на испанском или английском языке..."></textarea>
 
-                  <!-- 2. Режим комфортного чтения: текст книги + ручной разбор -->
                   <div id="readModeContainer" style="display: none;">
                         <div id="readArea"></div>
 
-                        <!-- Карточки выделения теперь живут здесь -->
                         <div id="manualSection" style="display: none; margin-top: 24px;">
                               <h2 style="color: var(--primary); margin-bottom: 12px;">📌 Выбранное вручную</h2>
                               <div id="manualList"></div>
@@ -118,7 +121,7 @@
                   </div>
             </div>
 
-            <!-- Автоматические списки NLP (отображаются внизу) -->
+            <!-- Результаты автоматического анализа -->
             <div id="nlpResultsSection">
                   <h2>🎯 Обороты и идиомы</h2>
                   <div id="phrasesList">
@@ -130,19 +133,15 @@
                         <p class="empty-state">Список пуст.</p>
                   </div>
             </div>
-
-            <!-- Блок ручного выбора -->
-            <h2 id="manualHeading" style="display: none; color: var(--primary);">📌 Выбранное вручную</h2>
-            <div id="manualList"></div>
-
-
       </div>
 
       <!-- Вкладка 2: Словарь -->
       <div id="tab-vocab" class="tab-content">
-            <div style="margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                  <input type="text" id="filterInput" oninput="handleFilterChange()"
-                        placeholder="🔍 Поиск по слову/переводу..." style="width: 240px;">
+            <div class="filter-toolbar">
+                  <div class="search-box">
+                        <input type="text" id="filterInput" oninput="handleFilterChange()"
+                              placeholder="🔍 Поиск по слову/переводу...">
+                  </div>
 
                   <select id="filterLanguage" onchange="handleFilterChange()">
                         <option value="all">🌐 Все языки</option>
@@ -154,27 +153,29 @@
                         <option value="all">📚 Все источники</option>
                   </select>
 
-                  <button class="btn btn-learn" onclick="loadVocabulary()">Обновить</button>
+                  <button class="btn btn-ghost" onclick="loadVocabulary()">Обновить</button>
             </div>
 
-            <table>
-                  <thead>
-                        <tr>
-                              <th style="width: 70px;">Язык</th>
-                              <th style="width: 80px;">Тип</th>
-                              <th style="width: 230px;">Слово / Источник / Разбор</th>
-                              <th>Контексты</th>
-                              <th style="width: 80px;">Встречено</th>
-                              <th style="width: 100px;">Статус</th>
-                              <th style="width: 60px;"></th>
-                        </tr>
-                  </thead>
-                  <tbody id="vocabTableBody"></tbody>
-            </table>
+            <div class="table-container">
+                  <table>
+                        <thead>
+                              <tr>
+                                    <th style="width: 70px;">Язык</th>
+                                    <th style="width: 80px;">Тип</th>
+                                    <th style="width: 230px;">Слово / Источник / Разбор</th>
+                                    <th>Контексты</th>
+                                    <th style="width: 80px;">Встречено</th>
+                                    <th style="width: 100px;">Статус</th>
+                                    <th style="width: 40px;"></th>
+                              </tr>
+                        </thead>
+                        <tbody id="vocabTableBody"></tbody>
+                  </table>
+            </div>
 
-            <!-- Пагинация строго внутри таба словаря -->
+            <!-- Пагинация словаря -->
             <div id="loadMoreContainer" style="text-align: center; margin-top: 16px; display: none;">
-                  <button class="btn btn-learn" id="btnLoadMore" onclick="loadNextPage()">
+                  <button class="btn btn-ghost" id="btnLoadMore" onclick="loadNextPage()">
                         ▼ Загрузить ещё (<span id="loadedCountInfo"></span>)
                   </button>
             </div>

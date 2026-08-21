@@ -1,73 +1,110 @@
 :root {
       --primary: #2563eb;
+      --primary-hover: #1d4ed8;
       --primary-light: #eff6ff;
-      --success: #059669;
+      --success: #10b981;
       --success-light: #ecfdf5;
-      --warning: #d97706;
+      --warning: #f59e0b;
       --warning-light: #fffbeb;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --text-main: #0f172a;
+      --bg-app: #f8fafc;
+      --bg-card: #ffffff;
+      --text-main: #1e293b;
       --text-muted: #64748b;
-      --border: #e2e8f0;
+      --border-color: #e2e8f0;
+      --radius: 8px;
+      --control-height: 36px;
 }
 
 * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
 }
 
 body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 14px;
-      line-height: 1.5;
       color: var(--text-main);
-      background: var(--bg);
-      max-width: 1000px;
-      margin: 24px auto;
-      padding: 0 20px;
+      background: var(--bg-app);
+      line-height: 1.5;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 16px 20px 40px;
 }
 
-h1 {
-      font-size: 24px;
+/* 1. Header */
+.app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+}
+
+.brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+}
+
+.logo-icon {
+      font-size: 20px;
+}
+
+.brand-title {
+      font-size: 17px;
       font-weight: 700;
-      margin: 0 0 20px 0;
+      letter-spacing: -0.3px;
 }
 
-h2 {
-      font-size: 18px;
+.user-menu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+}
+
+.username-badge {
+      font-size: 13px;
       font-weight: 600;
-      margin: 28px 0 14px 0;
-}
-
-.empty-state {
       color: var(--text-muted);
-      font-style: italic;
 }
 
-/* Навигация */
+/* 2. Navigation Tabs */
 .nav-tabs {
       display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-      border-bottom: 2px solid var(--border);
+      gap: 20px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 16px;
 }
 
 .tab-btn {
       background: none;
       border: none;
-      padding: 10px 16px;
-      font-family: inherit;
-      font-size: 15px;
+      padding: 8px 0 12px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
+      border-bottom: 2px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s ease;
+      font-family: inherit;
 }
 
 .tab-btn.active {
       color: var(--primary);
       border-bottom-color: var(--primary);
+}
+
+.badge {
+      background: #e2e8f0;
+      color: var(--text-main);
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 10px;
 }
 
 .tab-content {
@@ -78,101 +115,93 @@ h2 {
       display: block;
 }
 
-/* Панель ридера */
-.reader-controls {
+/* 3. Modern Toolbar */
+.toolbar {
       display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
+      justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
       flex-wrap: wrap;
 }
 
+.toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+}
+
+.select-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+}
+
 select,
-input[type="text"] {
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      font-family: inherit;
+input[type="text"],
+input[type="password"] {
+      height: var(--control-height);
+      padding: 0 10px;
       font-size: 13.5px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--text-main);
       outline: none;
+      font-family: inherit;
 }
 
 select:focus,
-input[type="text"]:focus {
+input:focus {
       border-color: var(--primary);
 }
 
-/* Переключатель режимов */
-.mode-switch {
+/* Segmented Control (Текст / Чтение) */
+.segmented-control {
       display: inline-flex;
       background: #e2e8f0;
-      padding: 3px;
-      border-radius: 8px;
-      gap: 2px;
+      padding: 2px;
+      border-radius: var(--radius);
+      height: var(--control-height);
+      align-items: center;
 }
 
-.mode-btn {
+.seg-btn {
       border: none;
       background: transparent;
-      padding: 6px 14px;
+      padding: 0 12px;
+      height: 32px;
       font-size: 13px;
       font-weight: 600;
       color: var(--text-muted);
       border-radius: 6px;
       cursor: pointer;
-      transition: all 0.15s ease;
       font-family: inherit;
 }
 
-.mode-btn:hover {
-      color: var(--text-main);
-}
-
-.mode-btn.active {
+.seg-btn.active {
       background: #ffffff;
       color: var(--primary);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-/* Текстовые блоки */
-#textContainer {
-      width: 100%;
-}
-
-textarea {
-      width: 100%;
-      height: 180px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      font-family: inherit;
-      font-size: 14px;
-      line-height: 1.6;
-      resize: vertical;
-      outline: none;
-}
-
-#readArea {
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 22px;
-      font-size: 16px;
-      color: #1e293b;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-      min-height: 180px;
-}
-
-/* Кнопки */
-button.btn {
-      font-family: inherit;
-      font-size: 13px;
+/* 4. Buttons */
+.btn {
+      height: var(--control-height);
+      padding: 0 14px;
+      font-size: 13.5px;
       font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
+      border-radius: var(--radius);
       border: 1px solid transparent;
-      transition: 0.15s ease;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      font-family: inherit;
+      white-space: nowrap;
 }
 
 .btn-primary {
@@ -181,7 +210,19 @@ button.btn {
 }
 
 .btn-primary:hover {
-      background: #1d4ed8;
+      background: var(--primary-hover);
+}
+
+.btn-ghost,
+.btn-learn {
+      background: #ffffff;
+      border-color: var(--border-color);
+      color: var(--text-main);
+}
+
+.btn-ghost:hover,
+.btn-learn:hover {
+      background: #f1f5f9;
 }
 
 .btn-translate {
@@ -192,17 +233,6 @@ button.btn {
 
 .btn-translate:hover {
       background: var(--primary);
-      color: #fff;
-}
-
-.btn-learn {
-      background: #f1f5f9;
-      color: #334155;
-      border-color: #cbd5e1;
-}
-
-.btn-learn:hover {
-      background: #334155;
       color: #fff;
 }
 
@@ -217,22 +247,100 @@ button.btn {
       color: #fff;
 }
 
+.btn-icon {
+      width: var(--control-height);
+      height: var(--control-height);
+      padding: 0;
+      border: 1px solid var(--border-color);
+      background: #ffffff;
+      border-radius: var(--radius);
+      font-size: 16px;
+      cursor: pointer;
+}
+
+.btn-sm {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 12.5px;
+}
+
 .btn-del {
       background: #fee2e2;
       color: #b91c1c;
       border-color: #fecaca;
+      height: 28px;
+      padding: 0 8px;
+      font-size: 12px;
 }
 
-/* Карточки */
+/* 5. Inputs and Text Area */
+textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 12px;
+      font-size: 14.5px;
+      line-height: 1.6;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      outline: none;
+      font-family: inherit;
+      resize: vertical;
+}
+
+textarea::placeholder {
+      color: var(--text-muted);
+}
+
+#readArea {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 20px;
+      font-size: 15.5px;
+      line-height: 1.7;
+}
+
+/* 6. NLP Results & Cards */
+#nlpResultsSection {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+}
+
+#nlpResultsSection h2,
+#manualSection h2 {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: -0.2px;
+}
+
+.empty-state {
+      background: #ffffff;
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      text-align: center;
+      margin: 0;
+}
+
 .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
       display: grid;
-      grid-template-columns: 1fr 170px;
-      gap: 16px;
+      grid-template-columns: 1fr 150px;
+      gap: 14px;
+      align-items: start;
 }
 
 .card.in-dict-learning {
@@ -241,23 +349,23 @@ button.btn {
 
 .card.in-dict-known {
       border-left: 4px solid var(--success);
-      opacity: 0.85;
+      opacity: 0.9;
 }
 
 .card-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
 }
 
 .word-title {
-      font-size: 16px;
+      font-size: 14.5px;
       font-weight: 700;
 }
 
 .tag {
-      padding: 2px 8px;
+      padding: 2px 6px;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 600;
@@ -280,87 +388,218 @@ button.btn {
 }
 
 .context {
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-muted);
       font-style: italic;
-      line-height: 1.5;
-      margin-bottom: 10px;
+      line-height: 1.45;
+      margin-bottom: 8px;
 }
 
 .llm-result-box {
       background: #f8fafc;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-color);
       border-radius: 6px;
-      padding: 10px 12px;
-      margin-top: 8px;
+      padding: 8px 12px;
+      margin-top: 6px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
 }
 
 .translation-text {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
       color: var(--success);
 }
 
 .breakdown-text {
-      font-size: 13px;
+      font-size: 12.5px;
       color: #334155;
       line-height: 1.45;
-      border-top: 1px dashed var(--border);
-      padding-top: 6px;
+      border-top: 1px dashed var(--border-color);
+      padding-top: 4px;
 }
 
 .btn-group {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
 }
 
-/* Таблица */
+.btn-group .btn {
+      height: 32px;
+      font-size: 12.5px;
+      width: 100%;
+}
+
+/* 7. Filter Toolbar & Table */
+.filter-toolbar {
+      display: grid;
+      grid-template-columns: 1fr 160px 180px 100px;
+      gap: 10px;
+      margin-bottom: 14px;
+}
+
+.search-box input {
+      width: 100%;
+}
+
+.table-container {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      overflow: hidden;
+}
+
 table {
       width: 100%;
       border-collapse: collapse;
-      background: var(--card-bg);
-      border-radius: 8px;
-      border: 1px solid var(--border);
 }
 
 th,
 td {
-      padding: 12px 14px;
+      padding: 10px 12px;
       text-align: left;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
+      border-bottom: 1px solid var(--border-color);
       font-size: 13.5px;
+      vertical-align: top;
 }
 
 th {
       background: #f8fafc;
-      font-weight: 600;
       color: var(--text-muted);
+      font-weight: 600;
+      font-size: 12.5px;
 }
 
 .vocab-word-block strong {
-      font-size: 15px;
+      font-size: 14px;
 }
 
 .vocab-translation {
       color: var(--success);
       font-weight: 600;
-      margin-top: 4px;
+      font-size: 13px;
+      margin-top: 2px;
 }
 
 .vocab-breakdown {
       color: var(--text-muted);
-      font-size: 12.5px;
-      margin-top: 4px;
+      font-size: 12px;
+      margin-top: 2px;
 }
 
 .context-list {
       margin: 0;
-      padding-left: 18px;
+      padding-left: 16px;
       color: var(--text-muted);
-      font-size: 13px;
+      font-size: 12.5px;
+}
+
+/* 8. Modals */
+.modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+}
+
+.modal-box {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 360px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.modal-box h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+}
+
+.modal-desc {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+}
+
+.modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+}
+
+/* 9. Mobile Responsiveness */
+@media (max-width: 768px) {
+      body {
+            padding: 12px;
+      }
+
+      .toolbar-left,
+      .toolbar-right {
+            width: 100%;
+      }
+
+      .toolbar-left {
+            flex-direction: column;
+            align-items: stretch;
+      }
+
+      .select-group,
+      .segmented-control,
+      .btn-primary {
+            width: 100%;
+      }
+
+      .segmented-control .seg-btn {
+            flex: 1;
+            text-align: center;
+      }
+
+      .filter-toolbar {
+            grid-template-columns: 1fr;
+      }
+
+      .card {
+            grid-template-columns: 1fr;
+      }
+
+      .card .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+      }
+
+      .card .btn-group .btn-translate {
+            grid-column: span 2;
+      }
+
+      table,
+      thead,
+      tbody,
+      th,
+      td,
+      tr {
+            display: block;
+      }
+
+      thead tr {
+            display: none;
+      }
+
+      tr[id^="row-"] {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 10px;
+            padding: 12px;
+      }
+
+      td {
+            border: none;
+            padding: 4px 0;
+      }
 }

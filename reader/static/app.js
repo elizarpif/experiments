@@ -448,8 +448,12 @@ document.addEventListener("mouseup", (e) => {
             const rect = range.getBoundingClientRect();
 
             tooltip.style.display = "block";
-            tooltip.style.top = `${window.scrollY + rect.top - 42}px`;
-            tooltip.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 65}px`;
+            tooltip.style.top = `${window.scrollY + rect.top - 48}px`;
+
+            // Центрируем с защитой от вылета за границы экрана смартфона
+            let leftPos = window.scrollX + rect.left + (rect.width / 2) - 65;
+            leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - 140));
+            tooltip.style.left = `${leftPos}px`;
       } else {
             hideSelectionTooltip();
       }
