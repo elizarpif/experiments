@@ -9,7 +9,31 @@
 </head>
 
 <body>
-      <h1>📖 Lexical Hub</h1>
+      <!-- Шапка с кнопкой пользователя -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="margin: 0;">📖 Lexical Hub</h1>
+            <div id="authProfileBlock" style="display: flex; align-items: center; gap: 10px;">
+                  <span id="displayUsername" style="font-weight: 600; color: var(--text-muted);"></span>
+                  <button class="btn btn-learn" id="btnAuthAction" onclick="handleAuthButtonClick()">Войти</button>
+            </div>
+      </div>
+
+      <!-- Модальное окно Авторизации/Регистрации -->
+      <div id="authModal"
+            style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: flex; align-items: center; justify-content: center;">
+            <div
+                  style="background: white; padding: 28px; border-radius: 12px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                  <h3 id="authModalTitle" style="margin-top: 0;">Вход в аккаунт</h3>
+                  <input type="text" id="authLogin" placeholder="Логин" style="width: 100%; margin-bottom: 10px;">
+                  <input type="password" id="authPassword" placeholder="Пароль"
+                        style="width: 100%; margin-bottom: 16px;">
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button class="btn btn-primary" id="btnSubmitAuth" onclick="submitAuthForm()">Войти</button>
+                        <button class="btn btn-learn" id="btnToggleAuthMode" onclick="toggleAuthMode()">Создать новый
+                              аккаунт</button>
+                  </div>
+            </div>
+      </div>
 
       <!-- Всплывающий тултип для выделения -->
       <div id="selectionTooltip" style="display: none; position: absolute; z-index: 1000;">

@@ -1,19 +1,129 @@
-const USER_ID = "default_user";
+// ====================================================
+// АВТОРИЗАЦИЯ И СОСТОЯНИЕ
+// ====================================================
 
-// Состояние пагинации словаря
-let currentOffset = 0;
-const PAGE_SIZE = 20;
-let currentItems = [];
-let totalMatchingItems = 0;
-let debounceTimer = null;
+let authToken = localStorage.getItem("auth_token") || null;
+let currentUsername = localStorage.getItem("auth_user") || null;
+let isRegisterMode = false;
 
-// Функция скрытия тултипа
+// Универсальная обертка для fetch с авторизацией
+async function apiFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authToken) {
+            options.headers["Authorization"] = `Bearer ${authToken}`;
+      }
+
+      // Вызываем нативный fetch браузера
+      const res = await fetch(url, options);
+
+      if (res.status === 401) {
+            logout();
+            throw new Error("Требуется авторизация");
+      }
+      return res;
+}
+
+function checkAuthUI() {
+      const modal = document.getElementById("authModal");
+      const userLabel = document.getElementById("displayUsername");
+      const authBtn = document.getElementById("btnAuthAction");
+
+      if (authToken && currentUsername) {
+            if (modal) modal.style.display = "none";
+            if (userLabel) userLabel.innerText = `👤 ${currentUsername}`;
+            if (authBtn) authBtn.innerText = "Выйти";
+      } else {
+            if (modal) modal.style.display = "flex";
+            if (userLabel) userLabel.innerText = "";
+            if (authBtn) authBtn.innerText = "Войти";
+      }
+}
+
+function toggleAuthMode() {
+      isRegisterMode = !isRegisterMode;
+      const title = document.getElementById("authModalTitle");
+      const btnSubmit = document.getElementById("btnSubmitAuth");
+      const btnToggle = document.getElementById("btnToggleAuthMode");
+
+      if (title) title.innerText = isRegisterMode ? "Регистрация" : "Вход в аккаунт";
+      if (btnSubmit) btnSubmit.innerText = isRegisterMode ? "Зарегистрироваться" : "Войти";
+      if (btnToggle) btnToggle.innerText = isRegisterMode ? "Уже есть аккаунт? Войти" : "Создать новый аккаунт";
+}
+
+async function submitAuthForm() {
+      const usernameInput = document.getElementById("authLogin");
+      const passwordInput = document.getElementById("authPassword");
+
+      const username = usernameInput ? usernameInput.value.trim() : "";
+      const password = passwordInput ? passwordInput.value.trim() : "";
+
+      if (!username || !password) return alert("Заполните логин и пароль!");
+
+      try {
+            let res;
+            if (isRegisterMode) {
+                  res = await fetch("/api/auth/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username, password })
+                  });
+            } else {
+                  const formData = new URLSearchParams();
+                  formData.append("username", username);
+                  formData.append("password", password);
+                  res = await fetch("/api/auth/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                        body: formData
+                  });
+            }
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || "Ошибка авторизации");
+
+            authToken = data.access_token;
+            currentUsername = data.username || username;
+            localStorage.setItem("auth_token", authToken);
+            localStorage.setItem("auth_user", currentUsername);
+
+            checkAuthUI();
+            loadSourcesList();
+            updateDictBadgeCount();
+      } catch (e) {
+            alert(e.message);
+      }
+}
+
+function logout() {
+      authToken = null;
+      currentUsername = null;
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      checkAuthUI();
+}
+
+function handleAuthButtonClick() {
+      if (authToken) {
+            logout();
+      } else {
+            const modal = document.getElementById("authModal");
+            if (modal) modal.style.display = "flex";
+      }
+}
+
+
+// ====================================================
+// РИДЕР, ВЫДЕЛЕНИЕ И АНАЛИЗ
+// ====================================================
+
+let currentSelectedText = "";
+let currentSelectedSentence = "";
+
 function hideSelectionTooltip() {
       const tooltip = document.getElementById("selectionTooltip");
       if (tooltip) tooltip.style.display = "none";
 }
 
-// Переключение табов с гарантированным снятием старых состояний
 function switchTab(tabId, btn) {
       hideSelectionTooltip();
 
@@ -25,19 +135,56 @@ function switchTab(tabId, btn) {
       if (btn) btn.classList.add('active');
 }
 
-// ----------------------------------------------------
-// РИДЕР И АНАЛИЗ ТЕКСТА
-// ----------------------------------------------------
+function setReaderMode(mode) {
+      hideSelectionTooltip();
+
+      const inputArea = document.getElementById("inputText");
+      const readModeContainer = document.getElementById("readModeContainer");
+      const readArea = document.getElementById("readArea");
+      const btnEdit = document.getElementById("btnModeEdit");
+      const btnRead = document.getElementById("btnModeRead");
+
+      const rawText = inputArea.value.trim();
+
+      if (mode === 'read') {
+            if (!rawText) {
+                  alert("Сначала вставьте текст для чтения!");
+                  return;
+            }
+
+            readArea.innerHTML = rawText
+                  .split(/\n\s*\n/)
+                  .map(p => `<p style="margin-bottom: 1.2em; line-height: 1.8;">${p.replace(/\n/g, "<br>")}</p>`)
+                  .join("");
+
+            inputArea.style.display = "none";
+            if (readModeContainer) readModeContainer.style.display = "block";
+
+            if (btnEdit) btnEdit.classList.remove("active");
+            if (btnRead) btnRead.classList.add("active");
+      } else {
+            if (readModeContainer) readModeContainer.style.display = "none";
+            inputArea.style.display = "block";
+
+            if (btnRead) btnRead.classList.remove("active");
+            if (btnEdit) btnEdit.classList.add("active");
+      }
+}
 
 async function analyzeText() {
       const text = document.getElementById("inputText").value.trim();
       if (!text) return alert("Введите текст!");
 
+      const lang = document.getElementById("readerLanguage") ? document.getElementById("readerLanguage").value : "es";
+
       try {
-            const res = await fetch("/api/analyze", {
+            const res = await apiFetch("/api/analyze", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ user_id: USER_ID, text: text })
+                  body: JSON.stringify({
+                        text: text,
+                        language: lang
+                  })
             });
             const data = await res.json();
             renderList("phrasesList", data.phrases || [], "phrase");
@@ -51,6 +198,8 @@ async function analyzeText() {
 
 function renderList(containerId, items, type) {
       const container = document.getElementById(containerId);
+      if (!container) return;
+
       if (!items.length) {
             container.innerHTML = "<p style='color:var(--text-muted); font-style:italic;'>Ничего нового не найдено.</p>";
             return;
@@ -60,9 +209,7 @@ function renderList(containerId, items, type) {
             let statusBadge = "";
             let cardClass = "card";
 
-            // ✅ Правильная проверка (двойное отрицание !! или не null):
             const isTracked = item.dict_info !== null && item.dict_info !== undefined;
-
             const existingTrans = item.dict_info?.translation || "";
             const existingBreakdown = item.dict_info?.breakdown || "";
 
@@ -123,11 +270,11 @@ async function explainItem(term, lemma, sentence, safeId, itemType) {
       if (breakDiv) breakDiv.style.display = "none";
 
       try {
-            const res = await fetch("/api/explain", {
+            const res = await apiFetch("/api/explain", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                        text: term,           // <-- передаем именно параметр term
+                        text: term,
                         sentence: sentence || "",
                         lemma: lemma || term,
                         item_type: itemType || "word",
@@ -152,6 +299,7 @@ async function explainItem(term, lemma, sentence, safeId, itemType) {
             console.error(e);
       }
 }
+
 async function saveWord(type, term, lemma, sentence, status, safeId, btnElement) {
       if (btnElement) {
             btnElement.disabled = true;
@@ -160,7 +308,7 @@ async function saveWord(type, term, lemma, sentence, status, safeId, btnElement)
 
       const transDiv = document.getElementById("trans-" + safeId);
       const breakDiv = document.getElementById("break-" + safeId);
-      const lang = document.getElementById("readerLanguage").value;
+      const lang = document.getElementById("readerLanguage") ? document.getElementById("readerLanguage").value : "es";
       const source = getActiveReaderSource();
       localStorage.setItem("last_selected_source", source);
 
@@ -168,11 +316,11 @@ async function saveWord(type, term, lemma, sentence, status, safeId, btnElement)
       const breakdown = breakDiv ? (breakDiv.dataset.breakdown || breakDiv.innerText.replace('🧩 Состав: ', '')) : "";
 
       try {
-            await fetch("/api/vocab/save", {
+            await apiFetch("/api/vocab/save", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                        user_id: USER_ID,
+                        user_id: currentUsername,
                         item_type: type,
                         term: term,
                         lemma: lemma,
@@ -205,31 +353,135 @@ async function saveWord(type, term, lemma, sentence, status, safeId, btnElement)
       }
 }
 
-// ----------------------------------------------------
+async function handleManualSelection() {
+      hideSelectionTooltip();
+
+      const term = currentSelectedText;
+      const sentence = currentSelectedSentence;
+      if (!term) return;
+
+      const isPhrase = term.includes(" ");
+      const itemType = isPhrase ? "phrase" : "word";
+
+      const manualSection = document.getElementById("manualSection");
+      if (manualSection) manualSection.style.display = "block";
+
+      const container = document.getElementById("manualList");
+      const safeId = escapeId("manual_" + term + "_" + Date.now());
+
+      const cardHtml = `
+    <div class="card" id="card-${safeId}" style="border-left: 4px solid var(--primary);">
+        <div class="card-content">
+            <div class="card-header">
+                <span class="word-title">${term.toUpperCase()}</span>
+                <span class="tag tag-gray">${isPhrase ? 'Фраза (выбор)' : 'Слово (выбор)'}</span>
+            </div>
+            <div class="context">"${sentence}"</div>
+            
+            <div class="llm-result-box" id="box-${safeId}" style="display: flex;">
+                <div class="translation-text" id="trans-${safeId}">⏳ Разбираем...</div>
+                <div class="breakdown-text" id="break-${safeId}" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-learn" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'learning', '${safeId}', this)">
+                ➕ В словарь
+            </button>
+            <button class="btn btn-known" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'known', '${safeId}', this)">
+                ✓ Знаю
+            </button>
+        </div>
+    </div>`;
+
+      if (container) container.insertAdjacentHTML("afterbegin", cardHtml);
+      explainItem(term, term, sentence, safeId, itemType);
+}
+
+// Слушатели мыши для всплывающей кнопки
+document.addEventListener("mousedown", (e) => {
+      if (!e.target.closest("#selectionTooltip")) {
+            hideSelectionTooltip();
+      }
+});
+
+document.addEventListener("mouseup", (e) => {
+      const tooltip = document.getElementById("selectionTooltip");
+      if (!tooltip) return;
+
+      if (e.target.closest("#selectionTooltip")) return;
+
+      const readArea = document.getElementById("readArea");
+      if (!readArea || readArea.style.display === "none" || !readArea.contains(e.target)) {
+            hideSelectionTooltip();
+            return;
+      }
+
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+
+      if (text.length >= 2 && text.length <= 120) {
+            currentSelectedText = text;
+            currentSelectedSentence = extractSurroundingSentence(selection, text);
+
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            tooltip.style.display = "block";
+            tooltip.style.top = `${window.scrollY + rect.top - 42}px`;
+            tooltip.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 65}px`;
+      } else {
+            hideSelectionTooltip();
+      }
+});
+
+function extractSurroundingSentence(selection, term) {
+      try {
+            const anchorNode = selection.anchorNode;
+            if (!anchorNode) return term;
+            const fullNodeText = anchorNode.textContent || "";
+            const sentences = fullNodeText.match(/[^.!?\n]+[.!?]?/g) || [fullNodeText];
+            const matchedSentence = sentences.find(s => s.includes(term));
+            return (matchedSentence ? matchedSentence.trim() : term);
+      } catch {
+            return term;
+      }
+}
+
+
+// ====================================================
 // СЛОВАРЬ И ПАГИНАЦИЯ
-// ----------------------------------------------------
+// ====================================================
+
+let currentOffset = 0;
+const PAGE_SIZE = 20;
+let currentItems = [];
+let totalMatchingItems = 0;
+let debounceTimer = null;
 
 async function loadVocabulary(reset = true) {
+      if (!authToken || !currentUsername) return;
+
       if (reset) {
             currentOffset = 0;
             currentItems = [];
       }
 
-      const lang = document.getElementById("filterLanguage").value;
-      const source = document.getElementById("filterSource").value;
-      const search = document.getElementById("filterInput").value.trim();
+      const lang = document.getElementById("filterLanguage") ? document.getElementById("filterLanguage").value : "all";
+      const source = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
+      const search = document.getElementById("filterInput") ? document.getElementById("filterInput").value.trim() : "";
 
-      let url = `/api/vocab/${USER_ID}?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      let url = `/api/vocab/${encodeURIComponent(currentUsername)}?limit=${PAGE_SIZE}&offset=${currentOffset}`;
       if (lang !== "all") url += `&language=${encodeURIComponent(lang)}`;
       if (source !== "all") url += `&source=${encodeURIComponent(source)}`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
 
       try {
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             const data = await res.json();
 
             totalMatchingItems = data.total;
-            document.getElementById("dictCount").innerText = data.total;
+            const dictCountEl = document.getElementById("dictCount");
+            if (dictCountEl) dictCountEl.innerText = data.total;
 
             if (reset) {
                   currentItems = data.items;
@@ -321,45 +573,38 @@ function renderVocabTable(items) {
 }
 
 async function updateStatus(id, newStatus) {
-      await fetch(`/api/vocab/${id}/status?status=${newStatus}`, { method: "PATCH" });
+      await apiFetch(`/api/vocab/${id}/status?status=${newStatus}`, { method: "PATCH" });
       const item = currentItems.find(i => i.id === id);
       if (item) item.status = newStatus;
 }
 
 async function deleteItem(id) {
       if (!confirm("Удалить из словаря?")) return;
-      await fetch(`/api/vocab/${id}`, { method: "DELETE" });
+      await apiFetch(`/api/vocab/${id}`, { method: "DELETE" });
       currentItems = currentItems.filter(i => i.id !== id);
       renderVocabTable(currentItems);
       updateDictBadgeCount();
 }
 
 async function updateDictBadgeCount() {
+      if (!authToken || !currentUsername) return;
       try {
-            const res = await fetch(`/api/vocab/${USER_ID}?limit=1&offset=0`);
+            const res = await apiFetch(`/api/vocab/${encodeURIComponent(currentUsername)}?limit=1&offset=0`);
             const data = await res.json();
-            document.getElementById("dictCount").innerText = data.total || 0;
+            const dictCountEl = document.getElementById("dictCount");
+            if (dictCountEl) dictCountEl.innerText = data.total || 0;
       } catch (e) {
             console.error(e);
       }
 }
 
-function escapeJs(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
-function escapeId(str) { return encodeURIComponent(str).replace(/%/g, '_'); }
-
-// Инициализация при открытии страницы
-document.addEventListener("DOMContentLoaded", () => {
-      updateDictBadgeCount();
-});
-
-// Загрузка источников из БД в ридер и фильтр словаря
 async function loadSourcesList() {
+      if (!authToken || !currentUsername) return;
       try {
-            const res = await fetch(`/api/sources/${USER_ID}`);
+            const res = await apiFetch(`/api/sources/${encodeURIComponent(currentUsername)}`);
             const data = await res.json();
             const sources = data.sources || [];
 
-            // 1. Заполняем селектор в панели чтения
             const select = document.getElementById("readerSourceSelect");
             if (select) {
                   const savedSource = localStorage.getItem("last_selected_source") || "Общее";
@@ -376,14 +621,12 @@ async function loadSourcesList() {
                   }
             }
 
-            // 2. Обновляем селектор в фильтре словаря
             updateSourceDropdown(sources);
       } catch (e) {
             console.error("Ошибка загрузки источников:", e);
       }
 }
 
-// Получение актуального источника перед сохранением
 function getActiveReaderSource() {
       const input = document.getElementById("readerSourceInput");
       const select = document.getElementById("readerSourceSelect");
@@ -394,7 +637,6 @@ function getActiveReaderSource() {
       return select ? select.value : "Общее";
 }
 
-// Переключение между выбором из списка и вводом новой книги
 function toggleNewSourceMode() {
       const input = document.getElementById("readerSourceInput");
       const select = document.getElementById("readerSourceSelect");
@@ -422,159 +664,25 @@ function onLanguageChange() {
       localStorage.setItem("last_selected_lang", val);
 }
 
-// ----------------------------------------------------
-// ИНИЦИАЛИЗАЦИЯ ПРИ СТАРТЕ
-// ----------------------------------------------------
+function escapeJs(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+function escapeId(str) { return encodeURIComponent(str).replace(/%/g, '_'); }
+
+
+// ====================================================
+// ЕДИНАЯ ТОЧКА СТАРТА ПРИЛОЖЕНИЯ
+// ====================================================
+
 document.addEventListener("DOMContentLoaded", () => {
-      // Восстанавливаем ранее выбранный язык
+      checkAuthUI();
+
       const savedLang = localStorage.getItem("last_selected_lang");
       if (savedLang) {
             const langEl = document.getElementById("readerLanguage");
             if (langEl) langEl.value = savedLang;
       }
 
-      // Подгружаем сохраненные источники и счетчик слов
-      loadSourcesList();
-      updateDictBadgeCount();
-});
-
-
-let currentSelectedText = "";
-let currentSelectedSentence = "";
-
-// Переключение режимов отображения
-function setReaderMode(mode) {
-      hideSelectionTooltip();
-
-      const inputArea = document.getElementById("inputText");
-      const readModeContainer = document.getElementById("readModeContainer");
-      const readArea = document.getElementById("readArea");
-      const btnEdit = document.getElementById("btnModeEdit");
-      const btnRead = document.getElementById("btnModeRead");
-
-      const rawText = inputArea.value.trim();
-
-      if (mode === 'read') {
-            if (!rawText) {
-                  alert("Сначала вставьте текст для чтения!");
-                  return;
-            }
-
-            readArea.innerHTML = rawText
-                  .split(/\n\s*\n/)
-                  .map(p => `<p style="margin-bottom: 1.2em; line-height: 1.8;">${p.replace(/\n/g, "<br>")}</p>`)
-                  .join("");
-
-            inputArea.style.display = "none";
-            readModeContainer.style.display = "block"; // Показываем читалку и контейнер ручных карточек
-
-            btnEdit.classList.remove("active");
-            btnRead.classList.add("active");
-      } else {
-            readModeContainer.style.display = "none";  // Скрываем читалку и ручные карточки
-            inputArea.style.display = "block";
-
-            btnRead.classList.remove("active");
-            btnEdit.classList.add("active");
-      }
-}
-
-// Добавление карточки при выделении
-async function handleManualSelection() {
-      hideSelectionTooltip();
-
-      const term = currentSelectedText;
-      const sentence = currentSelectedSentence;
-      if (!term) return;
-
-      const isPhrase = term.includes(" ");
-      const itemType = isPhrase ? "phrase" : "word";
-
-      // Открываем блок ручных карточек в читалке
-      const manualSection = document.getElementById("manualSection");
-      if (manualSection) manualSection.style.display = "block";
-
-      const container = document.getElementById("manualList");
-      const safeId = escapeId("manual_" + term + "_" + Date.now());
-
-      const cardHtml = `
-    <div class="card" id="card-${safeId}" style="border-left: 4px solid var(--primary);">
-        <div class="card-content">
-            <div class="card-header">
-                <span class="word-title">${term.toUpperCase()}</span>
-                <span class="tag tag-gray">${isPhrase ? 'Фраза (выбор)' : 'Слово (выбор)'}</span>
-            </div>
-            <div class="context">"${sentence}"</div>
-            
-            <div class="llm-result-box" id="box-${safeId}" style="display: flex;">
-                <div class="translation-text" id="trans-${safeId}">⏳ Разбираем...</div>
-                <div class="breakdown-text" id="break-${safeId}" style="display:none;"></div>
-            </div>
-        </div>
-        <div class="btn-group">
-            <button class="btn btn-learn" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'learning', '${safeId}', this)">
-                ➕ В словарь
-            </button>
-            <button class="btn btn-known" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'known', '${safeId}', this)">
-                ✓ Знаю
-            </button>
-        </div>
-    </div>`;
-
-      container.insertAdjacentHTML("afterbegin", cardHtml);
-      explainItem(term, term, sentence, safeId, itemType);
-}
-// Скрываем тултип сразу при начале любого клика вне самого тултипа
-document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("#selectionTooltip")) {
-            hideSelectionTooltip();
+      if (authToken && currentUsername) {
+            loadSourcesList();
+            updateDictBadgeCount();
       }
 });
-// Отслеживание выделения ТОЛЬКО в блоке комфортного чтения (#readArea)
-document.addEventListener("mouseup", (e) => {
-      const tooltip = document.getElementById("selectionTooltip");
-      if (!tooltip) return;
-
-      if (e.target.closest("#selectionTooltip")) return;
-
-      // Работает только если пользователь выделяет текст в режиме читалки
-      const readArea = document.getElementById("readArea");
-      if (!readArea || readArea.style.display === "none" || !readArea.contains(e.target)) {
-            hideSelectionTooltip();
-            return;
-      }
-
-      const selection = window.getSelection();
-      const text = selection.toString().trim();
-
-      if (text.length >= 2 && text.length <= 120) {
-            currentSelectedText = text;
-            currentSelectedSentence = extractSurroundingSentence(selection, text);
-
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-
-            tooltip.style.display = "block";
-            tooltip.style.top = `${window.scrollY + rect.top - 42}px`;
-            tooltip.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 65}px`;
-      } else {
-            hideSelectionTooltip();
-      }
-});
-
-// Достаем предложение целиком из контекста узла
-function extractSurroundingSentence(selection, term) {
-      try {
-            const anchorNode = selection.anchorNode;
-            if (!anchorNode) return term;
-            const fullNodeText = anchorNode.textContent || "";
-
-            // Ищем границы предложения по знакам завершения (. ! ? \n)
-            const sentences = fullNodeText.match(/[^.!?\n]+[.!?]?/g) || [fullNodeText];
-            const matchedSentence = sentences.find(s => s.includes(term));
-            return (matchedSentence ? matchedSentence.trim() : term);
-      } catch {
-            return term;
-      }
-}
-

@@ -39,7 +39,13 @@ async def lifespan(app: FastAPI):
     nlp_service = MultilingualNLPService()
     yield
 
+
+from auth import router as auth_router, get_current_user
+from database import init_db, get_user_dict_with_contexts
+
 app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
+
+app.include_router(auth_router)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -47,7 +53,6 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/", response_class=HTMLResponse)
 def get_ui():
     return FileResponse(STATIC_DIR / "index.html")
-
 
 @app.post("/api/analyze")
 def analyze_text(payload: AnalyzeRequest):

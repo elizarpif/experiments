@@ -8,8 +8,27 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
 def init_db():
     with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                hashed_password TEXT NOT NULL,
+                gemini_api_key TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS vocabulary (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,8 +64,37 @@ def init_db():
             conn.execute("ALTER TABLE vocabulary ADD COLUMN language TEXT DEFAULT 'es'")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN gemini_api_key TEXT")
+        except Exception:
+            pass
         conn.commit()
 
+def update_user_api_key(username: str, api_key: str):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET gemini_api_key = ? WHERE username = ?", (api_key.strip(), username))
+        conn.commit()
+
+def get_user_api_key(username: str) -> str | None:
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT gemini_api_key FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        return row["gemini_api_key"] if row and row["gemini_api_key"] else None
+    
+def create_user(username: str, password_hash: str):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (username, hashed_password) VALUES (?, ?)", (username, password_hash))
+        conn.commit()
+
+def get_user_by_username(username: str):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        return cursor.fetchone()
+    
 def save_or_update_item(
     user_id: str,
     item_type: str,
