@@ -12,8 +12,10 @@ class SaveItemRequest(BaseModel):
     context_sentence: str
     status: str = "learning"
     translation: str = ""
+    breakdown: str = ""
 
-class TranslateRequest(BaseModel):
+class ExplainRequest(BaseModel):
     text: str
-    source_lang: str = "es"
-    target_lang: str = "ru"
+    lemma: str = ""
+    sentence: str = ""
+    mode: str = "translate"  # "translate" | "breakdown"

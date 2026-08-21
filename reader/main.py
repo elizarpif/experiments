@@ -1,8 +1,13 @@
 from pathlib import Path
+import re
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse
-from contextlib import asynccontextmanager
-from deep_translator import GoogleTranslator
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from openai import OpenAI
+import os
+from typing import Optional
 
 from database import (
     init_db,
@@ -12,10 +17,17 @@ from database import (
     update_status_by_id,
     delete_item_by_id,
 )
+
 from nlp_service import SpanishNLPService
-from schemas import AnalyzeRequest, SaveItemRequest, TranslateRequest
+from schemas import AnalyzeRequest, SaveItemRequest, ExplainRequest
 
 nlp_service = None
+
+# Подключение к бесплатному Gemini API через совместимый протокол
+client = OpenAI(
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key="AQ.Ab8RN6Jm0tl2vy-XV0JwqU2XAuI_HCnTycZ5FSmCdDr28JDVyQ"
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,11 +38,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
 
-STATIC_INDEX = Path(__file__).resolve().parent / "static" / "index.html"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 def get_ui():
-    return FileResponse(STATIC_INDEX)
+    return FileResponse(STATIC_DIR / "index.html")
 
 @app.post("/api/analyze")
 def analyze_text(payload: AnalyzeRequest):
@@ -38,64 +51,90 @@ def analyze_text(payload: AnalyzeRequest):
     phrases, rare_words = nlp_service.process_chapter(payload.text, payload.user_id, user_dict)
     return {"phrases": phrases, "rare_words": rare_words}
 
-# @app.post("/api/translate")
-# def translate_text(payload: TranslateRequest):
-#     try:
-#         translated = GoogleTranslator(source=payload.source_lang, target=payload.target_lang).translate(payload.text)
-#         return {"translated": translated}
-#     except Exception as e:
-#         return {"translated": f"Ошибка перевода: {e}"}
+class ExplainRequest(BaseModel):
+    text: str
+    sentence: str = ""
+    lemma: str = ""
+    item_type: str = "word"
+    language: str = "es"  # "es" или "en"
 
-from openai import OpenAI
-from schemas import TranslateRequest
+class ExplainResponse(BaseModel):
+    translation: str
+    breakdown: str
 
-# Локальный клиент Ollama
-client = OpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"  # Ollama не требует ключ, но поле не должно быть пустым
-)
 
-@app.post("/api/translate")
-def translate_text(payload: TranslateRequest):
+class SaveItemRequest(BaseModel):
+    user_id: str
+    item_type: str
+    term: str
+    lemma: str
+    context_sentence: str = ""
+    status: str
+    translation: str = ""
+    breakdown: str = ""
+    source: str = "Общее"
+    language: str = "es"
+
+@app.post("/api/explain", response_model=ExplainResponse)
+def explain_text(payload: ExplainRequest):
     term = payload.text.strip()
-    sentence = payload.sentence.strip() if hasattr(payload, "sentence") and payload.sentence else ""
-    # Если на фронтенде передается лемма, используем её, иначе пробуем spaCy
-    lemma = getattr(payload, "lemma", None)
-    if not lemma and nlp_service:
-        doc = nlp_service.nlp(term)
-        lemma = doc[0].lemma_ if len(doc) > 0 else term
+    sentence = payload.sentence.strip() if payload.sentence else ""
+    lemma = payload.lemma.strip()
+    is_phrase = payload.item_type == "phrase"
+    lang_name = "английского" if payload.language == "en" else "испанского"
+    lang_code = "АНГЛИЙСКИЙ" if payload.language == "en" else "ИСПАНСКИЙ"
 
-    system_prompt = (
-        "You are an expert Spanish-to-Russian literary translator specializing in fantasy and fiction.\n"
-        "You will be given a target word, its grammatical lemma (base form), and the sentence context.\n\n"
-        "Instructions:\n"
-        "1. Use the lemma to anchor the root meaning (e.g., lemma 'fiera' = wild beast/ferocious creature).\n"
-        "2. Understand how the word functions in the scene (tone, relationship between characters, genre).\n"
-        "3. Provide 3-4 vivid, natural Russian translations that fit this exact context.\n\n"
-        "Format: Return ONLY the comma-separated Russian translations. Nothing else."
-    )
+    if is_phrase:
+        system_prompt = (
+            f"Ты — профессиональный филолог и переводчик художественной литературы с {lang_name} языка на русский.\n"
+            f"Разбери {lang_code} ОБОРОТ / ИДИОМУ в контексте предложения.\n\n"
+            "Выведи результат СТРОГО по шаблону:\n"
+            "RESULT:\n"
+            "ПЕРЕВОД: <2-3 точных литературных перевода на русский язык через запятую>\n"
+            "СОСТАВ: Буквально: <буквальное значение компонентов>. Переносное значение: <образный смысл фразеологизма>."
+        )
+    else:
+        system_prompt = (
+            f"Ты — профессиональный филолог и переводчик художественной литературы с {lang_name} языка на русский.\n"
+            f"Разбери отдельное {lang_code} СЛОВО в контексте предложения.\n\n"
+            "Выведи результат СТРОГО по шаблону:\n"
+            "RESULT:\n"
+            "ПЕРЕВОД: <2-3 точных литературных перевода на русский язык через запятую>\n"
+            "СОСТАВ: Корень/базовое слово + реальные суффиксы/приставки с их смысловым оттенком."
+        )
 
     user_prompt = (
-        f"Context sentence: \"{sentence}\"\n"
-        f"Target word: \"{term}\"\n"
-        f"Base lemma: \"{lemma}\""
+        f"Контекст: «{sentence}»\n"
+        f"Целевой элемент ({payload.language}): «{term}» (исходная форма: «{lemma}»)"
     )
 
     try:
         response = client.chat.completions.create(
-            model="qwen2.5:7b",  # Крайне рекомендуется переключить на 7b
+            model="gemini-3.5-flash-lite",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,
-            max_tokens=60
+            temperature=0.1,
+            max_tokens=300
         )
-        translated = response.choices[0].message.content.strip().strip('"').strip('.')
-        return {"translated": translated}
+        
+        full_text = response.choices[0].message.content or ""
+        res_block = full_text.split("RESULT:")[-1] if "RESULT:" in full_text else full_text
+        
+        trans_match = re.search(r"ПЕРЕВОД\s*[:\-]\s*(.+)", res_block, flags=re.IGNORECASE)
+        break_match = re.search(r"СОСТАВ\s*[:\-]\s*(.+)", res_block, flags=re.IGNORECASE)
+
+        translation = trans_match.group(1).strip().strip("*").strip() if trans_match else ""
+        breakdown = break_match.group(1).strip().strip("*").strip() if break_match else ""
+
+        if not translation and not breakdown:
+            translation = res_block.strip()
+
+        return ExplainResponse(translation=translation, breakdown=breakdown)
     except Exception as e:
-        return {"translated": f"Ошибка: {e}"}
-    
+        return ExplainResponse(translation=f"Ошибка Gemini API: {e}", breakdown="")
+
 @app.post("/api/vocab/save")
 def save_vocabulary_item(payload: SaveItemRequest):
     item_id = save_or_update_item(
@@ -106,13 +145,29 @@ def save_vocabulary_item(payload: SaveItemRequest):
         sentence=payload.context_sentence,
         status=payload.status,
         translation=payload.translation,
+        breakdown=payload.breakdown,
+        source=payload.source,
+        language=payload.language
     )
     return {"status": "ok", "item_id": item_id}
 
 @app.get("/api/vocab/{user_id}")
-def get_user_vocabulary(user_id: str):
-    items = get_all_user_items(user_id)
-    return {"user_id": user_id, "total": len(items), "items": items}
+def get_user_vocabulary(
+    user_id: str,
+    language: Optional[str] = None,
+    source: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
+):
+    return get_all_user_items(
+        user_id=user_id,
+        language=language,
+        source=source,
+        search=search,
+        limit=limit,
+        offset=offset
+    )
 
 @app.patch("/api/vocab/{item_id}/status")
 def update_item_status(item_id: int, status: str):
@@ -124,3 +179,9 @@ def delete_vocabulary_item(item_id: int):
     delete_item_by_id(item_id)
     return {"status": "deleted"}
 
+from database import get_user_sources  # не забудьте импортировать
+
+@app.get("/api/sources/{user_id}")
+def get_sources_list(user_id: str):
+    sources = get_user_sources(user_id)
+    return {"user_id": user_id, "sources": sources}
