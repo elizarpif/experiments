@@ -1,36 +1,33 @@
-from pathlib import Path
+import os
 import re
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from openai import OpenAI
-import os
+from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-load_dotenv()  # подгрузит переменные из .env в окружение
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from openai import OpenAI
+from pydantic import BaseModel
 
+load_dotenv()
+
+from auth import get_current_user, router as auth_router
 from database import (
-    init_db,
-    get_user_dict_with_contexts,
-    save_or_update_item,
-    get_all_user_items,
-    update_status_by_id,
     delete_item_by_id,
+    get_all_user_items,
+    get_user_api_key,
+    get_user_dict_with_contexts,
+    get_user_sources,
+    init_db,
+    save_or_update_item,
+    update_status_by_id,
 )
-
 from nlp_service import MultilingualNLPService
-from schemas import AnalyzeRequest, SaveItemRequest, ExplainRequest
 
 nlp_service = None
 
-# Подключение к бесплатному Gemini API через совместимый протокол
-client = OpenAI(
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-    api_key=os.getenv("GEMINI_TOKEN")
-)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,40 +37,27 @@ async def lifespan(app: FastAPI):
     yield
 
 
-from auth import router as auth_router, get_current_user
-from database import init_db, get_user_dict_with_contexts
-
 app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
-
 app.include_router(auth_router)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-@app.get("/", response_class=HTMLResponse)
-def get_ui():
-    return FileResponse(STATIC_DIR / "index.html")
 
-@app.post("/api/analyze")
-def analyze_text(
-    payload: AnalyzeRequest,
-    user_id: str = Depends(get_current_user)
-    ):
-    user_dict = get_user_dict_with_contexts(user_id, language=payload.language)
-    phrases, rare_words = nlp_service.process_chapter(
-        text=payload.text,
-        user_id=user_id,
-        user_dict=user_dict,
-        language=payload.language
-    )
-    return {"phrases": phrases, "rare_words": rare_words}
+# --- Pydantic Схемы ---
+
+class AnalyzeRequest(BaseModel):
+    text: str
+    language: str = "es"
+
 
 class ExplainRequest(BaseModel):
     text: str
     sentence: str = ""
     lemma: str = ""
     item_type: str = "word"
-    language: str = "es"  # "es" или "en"
+    language: str = "es"
+
 
 class ExplainResponse(BaseModel):
     translation: str
@@ -81,7 +65,6 @@ class ExplainResponse(BaseModel):
 
 
 class SaveItemRequest(BaseModel):
-    user_id: str
     item_type: str
     term: str
     lemma: str
@@ -92,8 +75,50 @@ class SaveItemRequest(BaseModel):
     source: str = "Общее"
     language: str = "es"
 
+
+# --- Маршруты страниц ---
+
+@app.get("/", response_class=HTMLResponse)
+def get_ui():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+# --- API Эндпоинты ---
+
+@app.post("/api/analyze")
+def analyze_text(
+    payload: AnalyzeRequest,
+    current_user: str = Depends(get_current_user)
+):
+    user_dict = get_user_dict_with_contexts(current_user, language=payload.language)
+    phrases, rare_words = nlp_service.process_chapter(
+        text=payload.text,
+        user_id=current_user,
+        user_dict=user_dict,
+        language=payload.language
+    )
+    return {"phrases": phrases, "rare_words": rare_words}
+
+
 @app.post("/api/explain", response_model=ExplainResponse)
-def explain_text(payload: ExplainRequest):
+def explain_text(
+    payload: ExplainRequest,
+    current_user: str = Depends(get_current_user)
+):
+    # Достаем ключ строго текущего пользователя
+    user_key = get_user_api_key(current_user)
+    
+    if not user_key:
+        raise HTTPException(
+            status_code=400,
+            detail="API-ключ Gemini не найден. Пожалуйста, укажите ваш личный ключ в настройках профиля (⚙️ API Ключ)."
+        )
+
+    client = OpenAI(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        api_key=user_key
+    )
+
     term = payload.text.strip()
     sentence = payload.sentence.strip() if payload.sentence else ""
     lemma = payload.lemma.strip()
@@ -152,10 +177,14 @@ def explain_text(payload: ExplainRequest):
     except Exception as e:
         return ExplainResponse(translation=f"Ошибка Gemini API: {e}", breakdown="")
 
+
 @app.post("/api/vocab/save")
-def save_vocabulary_item(payload: SaveItemRequest):
+def save_vocabulary_item(
+    payload: SaveItemRequest,
+    current_user: str = Depends(get_current_user)
+):
     item_id = save_or_update_item(
-        user_id=payload.user_id,
+        user_id=current_user,
         item_type=payload.item_type,
         term=payload.term,
         lemma=payload.lemma,
@@ -168,9 +197,10 @@ def save_vocabulary_item(payload: SaveItemRequest):
     )
     return {"status": "ok", "item_id": item_id}
 
-@app.get("/api/vocab/{user_id}")
+
+@app.get("/api/vocab")
 def get_user_vocabulary(
-    user_id: str,
+    current_user: str = Depends(get_current_user),
     language: Optional[str] = None,
     source: Optional[str] = None,
     search: Optional[str] = None,
@@ -178,7 +208,7 @@ def get_user_vocabulary(
     offset: int = 0
 ):
     return get_all_user_items(
-        user_id=user_id,
+        user_id=current_user,
         language=language,
         source=source,
         search=search,
@@ -186,19 +216,27 @@ def get_user_vocabulary(
         offset=offset
     )
 
+
 @app.patch("/api/vocab/{item_id}/status")
-def update_item_status(item_id: int, status: str):
+def update_item_status(
+    item_id: int,
+    status: str,
+    current_user: str = Depends(get_current_user)
+):
     update_status_by_id(item_id, status)
     return {"status": "ok"}
 
+
 @app.delete("/api/vocab/{item_id}")
-def delete_vocabulary_item(item_id: int):
+def delete_vocabulary_item(
+    item_id: int,
+    current_user: str = Depends(get_current_user)
+):
     delete_item_by_id(item_id)
     return {"status": "deleted"}
 
-from database import get_user_sources  # не забудьте импортировать
 
-@app.get("/api/sources/{user_id}")
-def get_sources_list(user_id: str):
-    sources = get_user_sources(user_id)
-    return {"user_id": user_id, "sources": sources}
+@app.get("/api/sources")
+def get_sources_list(current_user: str = Depends(get_current_user)):
+    sources = get_user_sources(current_user)
+    return {"user_id": current_user, "sources": sources}

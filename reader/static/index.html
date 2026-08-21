@@ -9,12 +9,29 @@
 </head>
 
 <body>
-      <!-- Шапка с кнопкой пользователя -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h1 style="margin: 0;">📖 Lexical Hub</h1>
-            <div id="authProfileBlock" style="display: flex; align-items: center; gap: 10px;">
-                  <span id="displayUsername" style="font-weight: 600; color: var(--text-muted);"></span>
-                  <button class="btn btn-learn" id="btnAuthAction" onclick="handleAuthButtonClick()">Войти</button>
+      <!-- Кнопка в шапке рядом с именем -->
+      <div id="authProfileBlock" style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn btn-learn" id="btnSettings" onclick="openApiKeyModal()" style="display: none;">⚙️ API
+                  Ключ</button>
+            <span id="displayUsername" style="font-weight: 600; color: var(--text-muted);"></span>
+            <button class="btn btn-learn" id="btnAuthAction" onclick="handleAuthButtonClick()">Войти</button>
+      </div>
+
+      <!-- Модалка ввода ключа -->
+      <div id="apiKeyModal"
+            style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
+            <div
+                  style="background: white; padding: 24px; border-radius: 12px; width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                  <h3 style="margin-top: 0;">🔑 Обновить Gemini API Ключ</h3>
+                  <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+                        Вставьте ваш ключ.
+                  </p>
+                  <input type="password" id="inputApiKey" placeholder="AIzaSy..."
+                        style="width: 100%; margin-bottom: 16px;">
+                  <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button class="btn btn-learn" onclick="closeApiKeyModal()">Отмена</button>
+                        <button class="btn btn-primary" onclick="saveApiKey()">Сохранить</button>
+                  </div>
             </div>
       </div>
 

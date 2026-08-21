@@ -2,8 +2,8 @@
 // АВТОРИЗАЦИЯ И СОСТОЯНИЕ
 // ====================================================
 
-let authToken = localStorage.getItem("auth_token") || null;
-let currentUsername = localStorage.getItem("auth_user") || null;
+let authToken = sessionStorage.getItem("auth_token") || null;
+let currentUsername = sessionStorage.getItem("auth_user") || null;
 let isRegisterMode = false;
 
 // Универсальная обертка для fetch с авторизацией
@@ -27,6 +27,10 @@ function checkAuthUI() {
       const modal = document.getElementById("authModal");
       const userLabel = document.getElementById("displayUsername");
       const authBtn = document.getElementById("btnAuthAction");
+      const btnSettings = document.getElementById("btnSettings");
+      if (btnSettings) {
+            btnSettings.style.display = (authToken && currentUsername) ? "inline-block" : "none";
+      }
 
       if (authToken && currentUsername) {
             if (modal) modal.style.display = "none";
@@ -83,8 +87,8 @@ async function submitAuthForm() {
 
             authToken = data.access_token;
             currentUsername = data.username || username;
-            localStorage.setItem("auth_token", authToken);
-            localStorage.setItem("auth_user", currentUsername);
+            sessionStorage.setItem("auth_token", authToken);
+            sessionStorage.setItem("auth_user", currentUsername);
 
             checkAuthUI();
             loadSourcesList();
@@ -97,9 +101,26 @@ async function submitAuthForm() {
 function logout() {
       authToken = null;
       currentUsername = null;
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_user");
+      sessionStorage.removeItem("auth_token");
+      sessionStorage.removeItem("auth_user");
+
+      // Сбрасываем таблицы и счетчики
+      const tbody = document.getElementById("vocabTableBody");
+      if (tbody) tbody.innerHTML = "";
+
+      const countEl = document.getElementById("dictCount");
+      if (countEl) countEl.innerText = "0";
+
+      const phrasesList = document.getElementById("phrasesList");
+      if (phrasesList) phrasesList.innerHTML = "";
+
+      const wordsList = document.getElementById("wordsList");
+      if (wordsList) wordsList.innerHTML = "";
+
       checkAuthUI();
+
+      // Перезагружаем страницу, чтобы полностью обнулить состояние в памяти
+      window.location.reload();
 }
 
 function handleAuthButtonClick() {
@@ -686,3 +707,47 @@ document.addEventListener("DOMContentLoaded", () => {
             updateDictBadgeCount();
       }
 });
+
+// modal for gemini key
+
+function openApiKeyModal() {
+      const modal = document.getElementById("apiKeyModal");
+      if (modal) {
+            modal.style.display = "flex";
+            document.getElementById("inputApiKey").value = "";
+            document.getElementById("inputApiKey").focus();
+      }
+}
+
+function closeApiKeyModal() {
+      const modal = document.getElementById("apiKeyModal");
+      if (modal) {
+            modal.style.display = "none";
+            document.getElementById("inputApiKey").value = "";
+      }
+}
+
+async function saveApiKey() {
+      const keyInput = document.getElementById("inputApiKey");
+      const key = keyInput ? keyInput.value.trim() : "";
+      if (!key) return alert("Введите ключ!");
+
+      try {
+            const res = await apiFetch("/api/auth/api-key", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ api_key: key })
+            });
+
+            if (!res.ok) {
+                  const err = await res.json();
+                  throw new Error(err.detail || "Ошибка сохранения");
+            }
+
+            const data = await res.json();
+            alert(data.message || "Ключ успешно сохранен!");
+            closeApiKeyModal();
+      } catch (e) {
+            alert(e.message);
+      }
+}

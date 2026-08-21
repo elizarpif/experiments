@@ -131,14 +131,12 @@ from database import create_user, get_user_by_username, update_user_api_key, get
 class ApiKeySchema(BaseModel):
     api_key: str
 
-@router.get("/api-key")
-def get_key(current_user: str = Depends(get_current_user)):
-    key = get_user_api_key(current_user)
-    # Возвращаем маскированный ключ для безопасности
-    masked = f"{key[:6]}...{key[-4:]}" if key and len(key) > 10 else ("Установлен" if key else "")
-    return {"has_key": bool(key), "masked_key": masked}
-
+# Только запись — бэкенд никогда не отдает ключ обратно в браузер
 @router.post("/api-key")
 def set_key(data: ApiKeySchema, current_user: str = Depends(get_current_user)):
-    update_user_api_key(current_user, data.api_key)
+    clean_key = data.api_key.strip()
+    if not clean_key:
+        raise HTTPException(status_code=400, detail="Ключ не может быть пустым")
+    
+    update_user_api_key(current_user, clean_key)
     return {"status": "ok", "message": "API ключ успешно сохранен"}
