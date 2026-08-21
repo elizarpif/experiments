@@ -491,7 +491,8 @@ async function loadVocabulary(reset = true) {
       const source = document.getElementById("filterSource") ? document.getElementById("filterSource").value : "all";
       const search = document.getElementById("filterInput") ? document.getElementById("filterInput").value.trim() : "";
 
-      let url = `/api/vocab/${encodeURIComponent(currentUsername)}?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      // Запрос идет на /api/vocab, а пользователя бэкенд узнает сам по JWT токену
+      let url = `/api/vocab?limit=${PAGE_SIZE}&offset=${currentOffset}`;
       if (lang !== "all") url += `&language=${encodeURIComponent(lang)}`;
       if (source !== "all") url += `&source=${encodeURIComponent(source)}`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
@@ -500,15 +501,15 @@ async function loadVocabulary(reset = true) {
             const res = await apiFetch(url);
             const data = await res.json();
 
-            totalMatchingItems = data.total;
+            totalMatchingItems = data.total || 0;
             const dictCountEl = document.getElementById("dictCount");
-            if (dictCountEl) dictCountEl.innerText = data.total;
+            if (dictCountEl) dictCountEl.innerText = totalMatchingItems;
 
             if (reset) {
-                  currentItems = data.items;
+                  currentItems = data.items || [];
                   updateSourceDropdown(data.sources || []);
             } else {
-                  currentItems = [...currentItems, ...data.items];
+                  currentItems = [...currentItems, ...(data.items || [])];
             }
 
             renderVocabTable(currentItems);
@@ -610,10 +611,12 @@ async function deleteItem(id) {
 async function updateDictBadgeCount() {
       if (!authToken || !currentUsername) return;
       try {
-            const res = await apiFetch(`/api/vocab/${encodeURIComponent(currentUsername)}?limit=1&offset=0`);
+            const res = await apiFetch(`/api/vocab?limit=1&offset=0`);
             const data = await res.json();
             const dictCountEl = document.getElementById("dictCount");
-            if (dictCountEl) dictCountEl.innerText = data.total || 0;
+            if (dictCountEl) {
+                  dictCountEl.innerText = data.total !== undefined ? data.total : 0;
+            }
       } catch (e) {
             console.error(e);
       }
