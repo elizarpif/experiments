@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+      <meta charset="UTF-8">
+      <title>Spanish Graded Reader Hub</title>
+      <style>
+            :root {
+                  --primary: #3b82f6;
+                  --success: #10b981;
+                  --warning: #f59e0b;
+                  --bg: #f8fafc;
+                  --text: #1e293b;
+            }
+
+            body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  max-width: 960px;
+                  margin: 20px auto;
+                  padding: 0 20px;
+                  background: var(--bg);
+                  color: var(--text);
+            }
+
+            .nav-tabs {
+                  display: flex;
+                  gap: 10px;
+                  margin-bottom: 20px;
+                  border-bottom: 2px solid #e2e8f0;
+            }
+
+            .tab-btn {
+                  background: none;
+                  border: none;
+                  padding: 10px 18px;
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #64748b;
+                  cursor: pointer;
+                  border-bottom: 3px solid transparent;
+            }
+
+            .tab-btn.active {
+                  color: var(--primary);
+                  border-bottom-color: var(--primary);
+            }
+
+            textarea {
+                  width: 100%;
+                  height: 160px;
+                  padding: 12px;
+                  border-radius: 8px;
+                  border: 1px solid #cbd5e1;
+                  font-size: 15px;
+                  box-sizing: border-box;
+                  resize: vertical;
+            }
+
+            button.btn {
+                  padding: 8px 14px;
+                  font-size: 14px;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 600;
+                  border: none;
+                  transition: 0.2s;
+            }
+
+            .btn-primary {
+                  background: var(--primary);
+                  color: white;
+                  margin-top: 10px;
+            }
+
+            .btn-learn {
+                  background: #e0e7ff;
+                  color: #4338ca;
+                  border: 1px solid #c7d2fe;
+            }
+
+            .btn-learn:hover {
+                  background: #4338ca;
+                  color: white;
+            }
+
+            .btn-known {
+                  background: #ecfdf5;
+                  color: #065f46;
+                  border: 1px solid #a7f3d0;
+            }
+
+            .btn-known:hover {
+                  background: #10b981;
+                  color: white;
+            }
+
+            .btn-translate {
+                  background: #fdf4ff;
+                  color: #a21caf;
+                  border: 1px solid #f5d0fe;
+            }
+
+            .btn-translate:hover {
+                  background: #a21caf;
+                  color: white;
+            }
+
+            .btn-del {
+                  background: #fee2e2;
+                  color: #991b1b;
+                  border: 1px solid #fecaca;
+            }
+
+            .btn-del:hover {
+                  background: #ef4444;
+                  color: white;
+            }
+
+            .card {
+                  background: white;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 8px;
+                  padding: 14px 18px;
+                  margin-bottom: 14px;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: flex-start;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            }
+
+            .card.in-dict-learning {
+                  border-left: 5px solid var(--warning);
+            }
+
+            .card.in-dict-known {
+                  border-left: 5px solid var(--success);
+                  opacity: 0.75;
+            }
+
+            .card-content {
+                  max-width: 72%;
+            }
+
+            .word-title {
+                  font-weight: 700;
+                  font-size: 17px;
+            }
+
+            .translation-text {
+                  color: #059669;
+                  font-weight: 600;
+                  font-size: 15px;
+                  margin-top: 4px;
+            }
+
+            .tag {
+                  padding: 2px 8px;
+                  border-radius: 4px;
+                  font-size: 12px;
+                  font-weight: 600;
+                  margin-left: 6px;
+            }
+
+            .tag-gray {
+                  background: #f1f5f9;
+                  color: #475569;
+            }
+
+            .tag-learning {
+                  background: #fef3c7;
+                  color: #b45309;
+            }
+
+            .tag-known {
+                  background: #d1fae5;
+                  color: #065f46;
+            }
+
+            .context-list {
+                  margin-top: 8px;
+                  padding-left: 18px;
+                  color: #475569;
+                  font-size: 13.5px;
+                  line-height: 1.45;
+            }
+
+            .context-list li {
+                  margin-bottom: 5px;
+                  font-style: italic;
+            }
+
+            .btn-more {
+                  background: none;
+                  border: none;
+                  color: var(--primary);
+                  font-size: 13px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  padding: 4px 0;
+                  display: inline-block;
+            }
+
+            .btn-group {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 6px;
+                  min-width: 160px;
+            }
+
+            .empty-state {
+                  color: #94a3b8;
+                  font-style: italic;
+                  padding: 15px 0;
+            }
+
+            .tab-content {
+                  display: none;
+            }
+
+            .tab-content.active {
+                  display: block;
+            }
+
+            table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  background: white;
+                  border-radius: 8px;
+                  overflow: hidden;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            }
+
+            th,
+            td {
+                  padding: 12px 14px;
+                  text-align: left;
+                  border-bottom: 1px solid #e2e8f0;
+                  vertical-align: top;
+            }
+
+            th {
+                  background: #f1f5f9;
+                  font-weight: 600;
+                  color: #475569;
+            }
+      </style>
+</head>
+
+<body>
+      <h1>📖 Spanish Lexical Hub</h1>
+
+      <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-reader', this)">Чтение и Анализ</button>
+            <button class="tab-btn" onclick="switchTab('tab-vocab', this); loadVocabulary();">📚 Мой Словарик (<span
+                        id="dictCount">0</span>)</button>
+      </div>
+
+      <!-- Вкладка 1: Анализ -->
+      <div id="tab-reader" class="tab-content active">
+            <textarea id="inputText" placeholder="Вставьте главу на испанском языке..."></textarea>
+            <button class="btn btn-primary" onclick="analyzeText()">Разобрать текст</button>
+
+            <h2 style="margin-top: 30px;">🎯 Обороты и идиомы</h2>
+            <div id="phrasesList">
+                  <p class="empty-state">Вставьте текст и запустите анализ.</p>
+            </div>
+
+            <h2 style="margin-top: 30px;">✨ Редкие слова (B2/C1)</h2>
+            <div id="wordsList">
+                  <p class="empty-state">Список пуст.</p>
+            </div>
+      </div>
+
+      <!-- Вкладка 2: Словарь -->
+      <div id="tab-vocab" class="tab-content">
+            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                  <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="🔍 Поиск по словарю..."
+                        style="padding: 8px 12px; width: 300px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                  <button class="btn btn-learn" onclick="loadVocabulary()">Обновить список</button>
+            </div>
+            <table>
+                  <thead>
+                        <tr>
+                              <th style="width: 80px;">Тип</th>
+                              <th style="width: 180px;">Слово / Перевод</th>
+                              <th>Все сохраненные контексты</th>
+                              <th style="width: 90px;">Встречено</th>
+                              <th style="width: 110px;">Статус</th>
+                              <th style="width: 80px;"></th>
+                        </tr>
+                  </thead>
+                  <tbody id="vocabTableBody"></tbody>
+            </table>
+      </div>
+
+      <script>
+            const USER_ID = "my_user";
+
+            function switchTab(tabId, btn) {
+                  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+                  document.getElementById(tabId).classList.add('active');
+                  btn.classList.add('active');
+            }
+
+            async function analyzeText() {
+                  const text = document.getElementById("inputText").value.trim();
+                  if (!text) return alert("Введите текст!");
+
+                  const res = await fetch("/api/analyze", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ user_id: USER_ID, text: text })
+                  });
+                  const data = await res.json();
+                  renderList("phrasesList", data.phrases, "phrase");
+                  renderList("wordsList", data.rare_words, "word");
+                  updateDictBadgeCount();
+            }
+
+            function renderList(containerId, items, type) {
+                  const container = document.getElementById(containerId);
+                  if (!items.length) {
+                        container.innerHTML = "<p class='empty-state'>Ничего нового не найдено.</p>";
+                        return;
+                  }
+                  container.innerHTML = items.map(item => {
+                        let statusBadge = "";
+                        let cardClass = "card";
+                        let isTracked = !!item.dict_info;
+                        let existingTrans = item.dict_info && item.dict_info.translation ? item.dict_info.translation : "";
+
+                        if (isTracked) {
+                              if (item.dict_info.status === 'learning') {
+                                    cardClass += " in-dict-learning";
+                                    statusBadge = `<span class="tag tag-learning">В словаре (${item.dict_info.seen_count} контекст(ов))</span>`;
+                              } else {
+                                    cardClass += " in-dict-known";
+                                    statusBadge = `<span class="tag tag-known">✓ Выучено (${item.dict_info.seen_count})</span>`;
+                              }
+                        } else {
+                              statusBadge = `<span class="tag tag-gray">${type === 'phrase' ? 'Оборот' : item.lemma}</span>`;
+                        }
+
+                        return `
+                    <div class="${cardClass}" id="card-${escapeId(item.lemma)}">
+                        <div class="card-content">
+                            <span class="word-title">${(item.original || item.word).toUpperCase()}</span>
+                            ${statusBadge}
+                            <div class="translation-text" id="trans-${escapeId(item.lemma)}">${existingTrans ? '🇷🇺 ' + existingTrans : ''}</div>
+                            <div class="context" style="margin-top:8px;">"${item.sentence}"</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-translate" onclick="translateWord('${escapeJs(item.original || item.word)}', '${escapeId(item.lemma)}')">🌐 Перевод</button>
+                            <button class="btn ${isTracked ? 'btn-known' : 'btn-learn'}" onclick="saveWord('${type}', '${escapeJs(item.original || item.word)}', '${escapeJs(item.lemma)}', '${escapeJs(item.sentence)}', 'learning', this)">
+                                ${isTracked ? 'В словарь (учу)' : '➕ В словарь'}
+                            </button>
+                            <button class="btn btn-known" onclick="saveWord('${type}', '${escapeJs(item.original || item.word)}', '${escapeJs(item.lemma)}', '${escapeJs(item.sentence)}', 'known', this)">✓ Знаю</button>
+                        </div>
+                    </div>`;
+                  }).join("");
+            }
+
+            async function translateWord(term, lemmaId) {
+                  const transDiv = document.getElementById("trans-" + lemmaId);
+                  transDiv.innerText = "⏳ Перевод...";
+                  const res = await fetch("/api/translate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ text: term })
+                  });
+                  const data = await res.json();
+                  transDiv.innerText = "🇷🇺 " + data.translated;
+                  transDiv.dataset.translation = data.translated;
+            }
+
+            async function saveWord(type, term, lemma, sentence, status, btnElement) {
+                  if (btnElement) {
+                        btnElement.disabled = true;
+                        btnElement.innerText = "⏳...";
+                  }
+
+                  const transDiv = document.getElementById("trans-" + escapeId(lemma));
+                  const translation = transDiv ? (transDiv.dataset.translation || transDiv.innerText.replace('🇷🇺 ', '')) : "";
+
+                  await fetch("/api/vocab/save", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                              user_id: USER_ID,
+                              item_type: type,
+                              term: term,
+                              lemma: lemma,
+                              context_sentence: sentence,
+                              status: status,
+                              translation: translation
+                        })
+                  });
+
+                  const card = document.getElementById("card-" + escapeId(lemma));
+                  if (card) {
+                        if (status === 'known') {
+                              card.classList.remove('in-dict-learning');
+                              card.classList.add('in-dict-known');
+                        } else {
+                              card.classList.add('in-dict-learning');
+                        }
+                  }
+
+                  if (btnElement) {
+                        btnElement.disabled = false;
+                        btnElement.style.background = "#10b981";
+                        btnElement.style.color = "#ffffff";
+                        btnElement.innerText = status === 'known' ? "✓ Выучено" : "✓ В словаре!";
+                        setTimeout(() => {
+                              btnElement.style.background = "";
+                              btnElement.style.color = "";
+                              btnElement.innerText = status === 'known' ? "✓ Знаю" : "➕ В словарь";
+                        }, 2000);
+                  }
+
+                  updateDictBadgeCount();
+            }
+
+            async function loadVocabulary() {
+                  const res = await fetch(`/api/vocab/${USER_ID}`);
+                  const data = await res.json();
+                  document.getElementById("dictCount").innerText = data.total;
+                  const tbody = document.getElementById("vocabTableBody");
+
+                  if (!data.items.length) {
+                        tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;color:#94a3b8;'>Словарик пока пуст</td></tr>";
+                        return;
+                  }
+
+                  tbody.innerHTML = data.items.map(item => {
+                        const totalContexts = item.contexts.length;
+                        const visibleContexts = item.contexts.slice(0, 5);
+                        const hiddenContexts = item.contexts.slice(5);
+
+                        let contextsHtml = visibleContexts.map(c => `<li>"${c}"</li>`).join("");
+
+                        if (hiddenContexts.length > 0) {
+                              const hiddenItems = hiddenContexts.map(c => `<li>"${c}"</li>`).join("");
+                              contextsHtml += `
+                        <div id="hidden-contexts-${item.id}" style="display:none;">${hiddenItems}</div>
+                        <button class="btn-more" id="btn-more-${item.id}" onclick="toggleContexts(${item.id})">
+                            ▼ Показать ещё ${hiddenContexts.length} контекст(ов)
+                        </button>
+                    `;
+                        }
+
+                        return `
+                    <tr id="row-${item.id}">
+                        <td><span class="tag ${item.item_type === 'phrase' ? 'tag-learning' : 'tag-gray'}">${item.item_type === 'phrase' ? 'Оборот' : 'Слово'}</span></td>
+                        <td>
+                            <strong>${item.lemma}</strong> <br>
+                            <small style="color:#64748b;">(${item.term})</small>
+                            ${item.translation ? `<div style="color:#059669; font-weight:600; margin-top:3px;">🇷🇺 ${item.translation}</div>` : ''}
+                        </td>
+                        <td><ol class="context-list" style="margin:0; padding-left: 18px;">${contextsHtml}</ol></td>
+                        <td><strong>${item.seen_count}</strong> раз(а)</td>
+                        <td>
+                            <select onchange="updateStatus(${item.id}, this.value)" style="padding:4px 8px; border-radius:4px;">
+                                <option value="learning" ${item.status === 'learning' ? 'selected' : ''}>🟡 Учу</option>
+                                <option value="known" ${item.status === 'known' ? 'selected' : ''}>🟢 Знаю</option>
+                            </select>
+                        </td>
+                        <td><button class="btn btn-del" onclick="deleteItem(${item.id})">Удалить</button></td>
+                    </tr>
+                `;
+                  }).join("");
+            }
+
+            function toggleContexts(itemId) {
+                  const hiddenDiv = document.getElementById(`hidden-contexts-${itemId}`);
+                  const btn = document.getElementById(`btn-more-${itemId}`);
+                  if (hiddenDiv.style.display === "none") {
+                        hiddenDiv.style.display = "block";
+                        btn.innerText = "▲ Свернуть контексты";
+                  } else {
+                        hiddenDiv.style.display = "none";
+                        btn.innerText = "▼ Показать ещё";
+                  }
+            }
+
+            async function updateStatus(id, newStatus) {
+                  await fetch(`/api/vocab/${id}/status?status=${newStatus}`, { method: "PATCH" });
+            }
+
+            async function deleteItem(id) {
+                  if (!confirm("Удалить из словаря?")) return;
+                  await fetch(`/api/vocab/${id}`, { method: "DELETE" });
+                  document.getElementById(`row-${id}`).remove();
+                  updateDictBadgeCount();
+            }
+
+            async function updateDictBadgeCount() {
+                  const res = await fetch(`/api/vocab/${USER_ID}`);
+                  const data = await res.json();
+                  document.getElementById("dictCount").innerText = data.total;
+            }
+
+            function filterTable() {
+                  const val = document.getElementById("filterInput").value.toLowerCase();
+                  document.querySelectorAll("#vocabTableBody tr").forEach(row => {
+                        row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
+                  });
+            }
+
+            function escapeJs(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+            function escapeId(str) { return encodeURIComponent(str).replace(/%/g, '_'); }
+
+            updateDictBadgeCount();
+      </script>
+</body>
+
+</html>
