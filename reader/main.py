@@ -9,6 +9,9 @@ from openai import OpenAI
 import os
 from typing import Optional
 
+from dotenv import load_dotenv
+load_dotenv()  # подгрузит переменные из .env в окружение
+
 from database import (
     init_db,
     get_user_dict_with_contexts,
