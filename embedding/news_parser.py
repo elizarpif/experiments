@@ -67,7 +67,7 @@ NEWS:
 {combined_text}"""        
         try:
             response = await client.chat.completions.create(
-                model="qwen2.5:1.5b",
+                model="qwen2.5:3b",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0
             )
