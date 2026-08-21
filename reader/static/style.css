@@ -1,0 +1,366 @@
+:root {
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --success: #059669;
+      --success-light: #ecfdf5;
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+}
+
+* {
+      box-sizing: border-box;
+}
+
+body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-main);
+      background: var(--bg);
+      max-width: 1000px;
+      margin: 24px auto;
+      padding: 0 20px;
+}
+
+h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 20px 0;
+}
+
+h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 28px 0 14px 0;
+}
+
+.empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+}
+
+/* Навигация */
+.nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+}
+
+.tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+}
+
+.tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+}
+
+.tab-content {
+      display: none;
+}
+
+.tab-content.active {
+      display: block;
+}
+
+/* Панель ридера */
+.reader-controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+}
+
+select,
+input[type="text"] {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 13.5px;
+      outline: none;
+}
+
+select:focus,
+input[type="text"]:focus {
+      border-color: var(--primary);
+}
+
+/* Переключатель режимов */
+.mode-switch {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 2px;
+}
+
+.mode-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+}
+
+.mode-btn:hover {
+      color: var(--text-main);
+}
+
+.mode-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Текстовые блоки */
+#textContainer {
+      width: 100%;
+}
+
+textarea {
+      width: 100%;
+      height: 180px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+}
+
+#readArea {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 22px;
+      font-size: 16px;
+      color: #1e293b;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      min-height: 180px;
+}
+
+/* Кнопки */
+button.btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: 0.15s ease;
+}
+
+.btn-primary {
+      background: var(--primary);
+      color: #fff;
+}
+
+.btn-primary:hover {
+      background: #1d4ed8;
+}
+
+.btn-translate {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: #bfdbfe;
+}
+
+.btn-translate:hover {
+      background: var(--primary);
+      color: #fff;
+}
+
+.btn-learn {
+      background: #f1f5f9;
+      color: #334155;
+      border-color: #cbd5e1;
+}
+
+.btn-learn:hover {
+      background: #334155;
+      color: #fff;
+}
+
+.btn-known {
+      background: var(--success-light);
+      color: var(--success);
+      border-color: #a7f3d0;
+}
+
+.btn-known:hover {
+      background: var(--success);
+      color: #fff;
+}
+
+.btn-del {
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fecaca;
+}
+
+/* Карточки */
+.card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: grid;
+      grid-template-columns: 1fr 170px;
+      gap: 16px;
+}
+
+.card.in-dict-learning {
+      border-left: 4px solid var(--warning);
+}
+
+.card.in-dict-known {
+      border-left: 4px solid var(--success);
+      opacity: 0.85;
+}
+
+.card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+}
+
+.word-title {
+      font-size: 16px;
+      font-weight: 700;
+}
+
+.tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+}
+
+.tag-gray {
+      background: #f1f5f9;
+      color: var(--text-muted);
+}
+
+.tag-learning {
+      background: var(--warning-light);
+      color: var(--warning);
+}
+
+.tag-known {
+      background: var(--success-light);
+      color: var(--success);
+}
+
+.context {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.5;
+      margin-bottom: 10px;
+}
+
+.llm-result-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+}
+
+.translation-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--success);
+}
+
+.breakdown-text {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.45;
+      border-top: 1px dashed var(--border);
+      padding-top: 6px;
+}
+
+.btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+}
+
+/* Таблица */
+table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+}
+
+th,
+td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 13.5px;
+}
+
+th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: var(--text-muted);
+}
+
+.vocab-word-block strong {
+      font-size: 15px;
+}
+
+.vocab-translation {
+      color: var(--success);
+      font-weight: 600;
+      margin-top: 4px;
+}
+
+.vocab-breakdown {
+      color: var(--text-muted);
+      font-size: 12.5px;
+      margin-top: 4px;
+}
+
+.context-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-muted);
+      font-size: 13px;
+}

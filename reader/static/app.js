@@ -7,12 +7,22 @@ let currentItems = [];
 let totalMatchingItems = 0;
 let debounceTimer = null;
 
-// Переключение вкладок
+// Функция скрытия тултипа
+function hideSelectionTooltip() {
+      const tooltip = document.getElementById("selectionTooltip");
+      if (tooltip) tooltip.style.display = "none";
+}
+
+// Переключение табов с гарантированным снятием старых состояний
 function switchTab(tabId, btn) {
+      hideSelectionTooltip();
+
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      btn.classList.add('active');
+
+      const targetTab = document.getElementById(tabId);
+      if (targetTab) targetTab.classList.add('active');
+      if (btn) btn.classList.add('active');
 }
 
 // ----------------------------------------------------
@@ -106,20 +116,20 @@ async function explainItem(term, lemma, sentence, safeId, itemType) {
       const boxDiv = document.getElementById("box-" + safeId);
       const transDiv = document.getElementById("trans-" + safeId);
       const breakDiv = document.getElementById("break-" + safeId);
-      const lang = document.getElementById("readerLanguage").value;
+      const lang = document.getElementById("readerLanguage") ? document.getElementById("readerLanguage").value : "es";
 
-      boxDiv.style.display = "flex";
-      transDiv.innerText = "⏳ Разбираем...";
-      breakDiv.style.display = "none";
+      if (boxDiv) boxDiv.style.display = "flex";
+      if (transDiv) transDiv.innerText = "⏳ Разбираем...";
+      if (breakDiv) breakDiv.style.display = "none";
 
       try {
             const res = await fetch("/api/explain", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                        text: term,
-                        sentence: sentence,
-                        lemma: lemma,
+                        text: term,           // <-- передаем именно параметр term
+                        sentence: sentence || "",
+                        lemma: lemma || term,
                         item_type: itemType || "word",
                         language: lang
                   })
@@ -127,20 +137,21 @@ async function explainItem(term, lemma, sentence, safeId, itemType) {
             const data = await res.json();
 
             const translation = data.translation || "Перевод не найден";
-            transDiv.innerText = "🇷🇺 " + translation;
-            transDiv.dataset.translation = translation;
+            if (transDiv) {
+                  transDiv.innerText = "🇷🇺 " + translation;
+                  transDiv.dataset.translation = translation;
+            }
 
-            if (data.breakdown) {
+            if (data.breakdown && breakDiv) {
                   breakDiv.innerHTML = "🧩 <strong>Состав:</strong> " + data.breakdown;
                   breakDiv.dataset.breakdown = data.breakdown;
                   breakDiv.style.display = "block";
             }
       } catch (e) {
-            transDiv.innerText = "Ошибка разбора";
+            if (transDiv) transDiv.innerText = "Ошибка разбора";
             console.error(e);
       }
 }
-
 async function saveWord(type, term, lemma, sentence, status, safeId, btnElement) {
       if (btnElement) {
             btnElement.disabled = true;
@@ -426,3 +437,144 @@ document.addEventListener("DOMContentLoaded", () => {
       loadSourcesList();
       updateDictBadgeCount();
 });
+
+
+let currentSelectedText = "";
+let currentSelectedSentence = "";
+
+// Переключение режимов отображения
+function setReaderMode(mode) {
+      hideSelectionTooltip();
+
+      const inputArea = document.getElementById("inputText");
+      const readModeContainer = document.getElementById("readModeContainer");
+      const readArea = document.getElementById("readArea");
+      const btnEdit = document.getElementById("btnModeEdit");
+      const btnRead = document.getElementById("btnModeRead");
+
+      const rawText = inputArea.value.trim();
+
+      if (mode === 'read') {
+            if (!rawText) {
+                  alert("Сначала вставьте текст для чтения!");
+                  return;
+            }
+
+            readArea.innerHTML = rawText
+                  .split(/\n\s*\n/)
+                  .map(p => `<p style="margin-bottom: 1.2em; line-height: 1.8;">${p.replace(/\n/g, "<br>")}</p>`)
+                  .join("");
+
+            inputArea.style.display = "none";
+            readModeContainer.style.display = "block"; // Показываем читалку и контейнер ручных карточек
+
+            btnEdit.classList.remove("active");
+            btnRead.classList.add("active");
+      } else {
+            readModeContainer.style.display = "none";  // Скрываем читалку и ручные карточки
+            inputArea.style.display = "block";
+
+            btnRead.classList.remove("active");
+            btnEdit.classList.add("active");
+      }
+}
+
+// Добавление карточки при выделении
+async function handleManualSelection() {
+      hideSelectionTooltip();
+
+      const term = currentSelectedText;
+      const sentence = currentSelectedSentence;
+      if (!term) return;
+
+      const isPhrase = term.includes(" ");
+      const itemType = isPhrase ? "phrase" : "word";
+
+      // Открываем блок ручных карточек в читалке
+      const manualSection = document.getElementById("manualSection");
+      if (manualSection) manualSection.style.display = "block";
+
+      const container = document.getElementById("manualList");
+      const safeId = escapeId("manual_" + term + "_" + Date.now());
+
+      const cardHtml = `
+    <div class="card" id="card-${safeId}" style="border-left: 4px solid var(--primary);">
+        <div class="card-content">
+            <div class="card-header">
+                <span class="word-title">${term.toUpperCase()}</span>
+                <span class="tag tag-gray">${isPhrase ? 'Фраза (выбор)' : 'Слово (выбор)'}</span>
+            </div>
+            <div class="context">"${sentence}"</div>
+            
+            <div class="llm-result-box" id="box-${safeId}" style="display: flex;">
+                <div class="translation-text" id="trans-${safeId}">⏳ Разбираем...</div>
+                <div class="breakdown-text" id="break-${safeId}" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-learn" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'learning', '${safeId}', this)">
+                ➕ В словарь
+            </button>
+            <button class="btn btn-known" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'known', '${safeId}', this)">
+                ✓ Знаю
+            </button>
+        </div>
+    </div>`;
+
+      container.insertAdjacentHTML("afterbegin", cardHtml);
+      explainItem(term, term, sentence, safeId, itemType);
+}
+// Скрываем тултип сразу при начале любого клика вне самого тултипа
+document.addEventListener("mousedown", (e) => {
+      if (!e.target.closest("#selectionTooltip")) {
+            hideSelectionTooltip();
+      }
+});
+// Отслеживание выделения ТОЛЬКО в блоке комфортного чтения (#readArea)
+document.addEventListener("mouseup", (e) => {
+      const tooltip = document.getElementById("selectionTooltip");
+      if (!tooltip) return;
+
+      if (e.target.closest("#selectionTooltip")) return;
+
+      // Работает только если пользователь выделяет текст в режиме читалки
+      const readArea = document.getElementById("readArea");
+      if (!readArea || readArea.style.display === "none" || !readArea.contains(e.target)) {
+            hideSelectionTooltip();
+            return;
+      }
+
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+
+      if (text.length >= 2 && text.length <= 120) {
+            currentSelectedText = text;
+            currentSelectedSentence = extractSurroundingSentence(selection, text);
+
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            tooltip.style.display = "block";
+            tooltip.style.top = `${window.scrollY + rect.top - 42}px`;
+            tooltip.style.left = `${window.scrollX + rect.left + (rect.width / 2) - 65}px`;
+      } else {
+            hideSelectionTooltip();
+      }
+});
+
+// Достаем предложение целиком из контекста узла
+function extractSurroundingSentence(selection, term) {
+      try {
+            const anchorNode = selection.anchorNode;
+            if (!anchorNode) return term;
+            const fullNodeText = anchorNode.textContent || "";
+
+            // Ищем границы предложения по знакам завершения (. ! ? \n)
+            const sentences = fullNodeText.match(/[^.!?\n]+[.!?]?/g) || [fullNodeText];
+            const matchedSentence = sentences.find(s => s.includes(term));
+            return (matchedSentence ? matchedSentence.trim() : term);
+      } catch {
+            return term;
+      }
+}
+

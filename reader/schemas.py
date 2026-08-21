@@ -1,8 +1,9 @@
 from pydantic import BaseModel
 
 class AnalyzeRequest(BaseModel):
-    user_id: str = "my_user"
+    user_id: str
     text: str
+    language: str = "es"  # "es" или "en"
 
 class SaveItemRequest(BaseModel):
     user_id: str = "my_user"

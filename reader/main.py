@@ -18,7 +18,7 @@ from database import (
     delete_item_by_id,
 )
 
-from nlp_service import SpanishNLPService
+from nlp_service import MultilingualNLPService
 from schemas import AnalyzeRequest, SaveItemRequest, ExplainRequest
 
 nlp_service = None
@@ -26,14 +26,14 @@ nlp_service = None
 # Подключение к бесплатному Gemini API через совместимый протокол
 client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-    api_key="AQ.Ab8RN6Jm0tl2vy-XV0JwqU2XAuI_HCnTycZ5FSmCdDr28JDVyQ"
+    api_key=os.getenv("GEMINI_TOKEN")
 )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global nlp_service
     init_db()
-    nlp_service = SpanishNLPService()
+    nlp_service = MultilingualNLPService()
     yield
 
 app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
@@ -45,10 +45,16 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def get_ui():
     return FileResponse(STATIC_DIR / "index.html")
 
+
 @app.post("/api/analyze")
 def analyze_text(payload: AnalyzeRequest):
-    user_dict = get_user_dict_with_contexts(payload.user_id)
-    phrases, rare_words = nlp_service.process_chapter(payload.text, payload.user_id, user_dict)
+    user_dict = get_user_dict_with_contexts(payload.user_id, language=payload.language)
+    phrases, rare_words = nlp_service.process_chapter(
+        text=payload.text,
+        user_id=payload.user_id,
+        user_dict=user_dict,
+        language=payload.language
+    )
     return {"phrases": phrases, "rare_words": rare_words}
 
 class ExplainRequest(BaseModel):
