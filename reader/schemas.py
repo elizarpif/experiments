@@ -1,7 +1,8 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class AnalyzeRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     text: str
     language: str = "es"  # "es" или "en"
 

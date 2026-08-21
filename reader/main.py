@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -55,11 +55,14 @@ def get_ui():
     return FileResponse(STATIC_DIR / "index.html")
 
 @app.post("/api/analyze")
-def analyze_text(payload: AnalyzeRequest):
-    user_dict = get_user_dict_with_contexts(payload.user_id, language=payload.language)
+def analyze_text(
+    payload: AnalyzeRequest,
+    user_id: str = Depends(get_current_user)
+    ):
+    user_dict = get_user_dict_with_contexts(user_id, language=payload.language)
     phrases, rare_words = nlp_service.process_chapter(
         text=payload.text,
-        user_id=payload.user_id,
+        user_id=user_id,
         user_dict=user_dict,
         language=payload.language
     )
