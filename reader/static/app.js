@@ -553,7 +553,7 @@ async function loadVocabulary(reset = true) {
 
             if (reset) {
                   currentItems = data.items || [];
-                  updateSourceDropdown(data.sources || []);
+                  populateAllSourceDropdowns(data.sources || []);
             } else {
                   currentItems = [...currentItems, ...(data.items || [])];
             }
@@ -668,30 +668,53 @@ async function updateDictBadgeCount() {
       }
 }
 
+// Единая функция обновления обоих селекторов (в ридере и в словаре)
+function populateAllSourceDropdowns(sources = []) {
+      const readerSelect = document.getElementById("readerSourceSelect");
+      const filterSelect = document.getElementById("filterSource");
+
+      const savedReaderSource = localStorage.getItem("last_selected_source") || "Общее";
+      const currentFilterSource = filterSelect ? filterSelect.value : "all";
+
+      // Убираем дубли и гарантируем наличие 'Общее'
+      const uniqueSources = Array.from(new Set(sources.filter(Boolean)));
+      if (!uniqueSources.includes("Общее")) {
+            uniqueSources.unshift("Общее");
+      }
+
+      // 1. Обновляем селект в ридере
+      if (readerSelect) {
+            readerSelect.innerHTML = uniqueSources.map(src =>
+                  `<option value="${src}">${src === "Общее" ? "📚 Общее" : src}</option>`
+            ).join("");
+
+            if (uniqueSources.includes(savedReaderSource)) {
+                  readerSelect.value = savedReaderSource;
+            } else {
+                  readerSelect.value = "Общее";
+            }
+      }
+
+      // 2. Обновляем селект в словаре
+      if (filterSelect) {
+            let filterHtml = '<option value="all">📚 Все источники</option>';
+            uniqueSources.forEach(src => {
+                  const isSelected = (src === currentFilterSource) ? 'selected' : '';
+                  filterHtml += `<option value="${src}" ${isSelected}>${src}</option>`;
+            });
+            filterSelect.innerHTML = filterHtml;
+      }
+}
+
+// Загрузка источников с бэкенда
 async function loadSourcesList() {
       if (!authToken || !currentUsername) return;
       try {
-            const res = await apiFetch(`/api/sources/${encodeURIComponent(currentUsername)}`);
+            const res = await apiFetch("/api/sources");
+            if (!res.ok) return;
             const data = await res.json();
             const sources = data.sources || [];
-
-            const select = document.getElementById("readerSourceSelect");
-            if (select) {
-                  const savedSource = localStorage.getItem("last_selected_source") || "Общее";
-                  let html = '<option value="Общее">Общее</option>';
-                  sources.forEach(src => {
-                        if (src !== "Общее") {
-                              html += `<option value="${src}">${src}</option>`;
-                        }
-                  });
-                  select.innerHTML = html;
-
-                  if (sources.includes(savedSource) || savedSource === "Общее") {
-                        select.value = savedSource;
-                  }
-            }
-
-            updateSourceDropdown(sources);
+            populateAllSourceDropdowns(sources);
       } catch (e) {
             console.error("Ошибка загрузки источников:", e);
       }
