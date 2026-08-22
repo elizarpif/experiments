@@ -533,6 +533,20 @@ th {
       gap: 8px;
 }
 
+#selectionTooltip {
+      position: absolute;
+      z-index: 9999;
+      pointer-events: auto;
+}
+
+#selectionTooltip button {
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      white-space: nowrap;
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 20px;
+}
+
 /* 9. Mobile Responsiveness */
 @media (max-width: 768px) {
       body {

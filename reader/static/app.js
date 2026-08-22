@@ -418,43 +418,85 @@ async function handleManualSelection() {
       explainItem(term, term, sentence, safeId, itemType);
 }
 
-// Слушатели мыши для всплывающей кнопки
-document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("#selectionTooltip")) {
-            hideSelectionTooltip();
-      }
-});
+// ====================================================
+// ОБРАБОТКА ВЫДЕЛЕНИЯ ТЕКСТА (DESKTOP + iOS / SAFARI)
+// ====================================================
 
-document.addEventListener("mouseup", (e) => {
-      const tooltip = document.getElementById("selectionTooltip");
-      if (!tooltip) return;
+let selectionTimeout = null;
 
-      if (e.target.closest("#selectionTooltip")) return;
-
+function checkAndShowSelectionTooltip() {
       const readArea = document.getElementById("readArea");
-      if (!readArea || readArea.style.display === "none" || !readArea.contains(e.target)) {
+      const tooltip = document.getElementById("selectionTooltip");
+      if (!tooltip || !readArea || readArea.style.display === "none") {
             hideSelectionTooltip();
             return;
       }
 
       const selection = window.getSelection();
+      if (!selection || selection.isCollapsed) {
+            hideSelectionTooltip();
+            return;
+      }
+
       const text = selection.toString().trim();
+
+      // Проверяем, что выделенный текст находится именно внутри зоны чтения
+      if (!readArea.contains(selection.anchorNode)) {
+            hideSelectionTooltip();
+            return;
+      }
 
       if (text.length >= 2 && text.length <= 120) {
             currentSelectedText = text;
             currentSelectedSentence = extractSurroundingSentence(selection, text);
 
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
+            try {
+                  const range = selection.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
 
-            tooltip.style.display = "block";
-            tooltip.style.top = `${window.scrollY + rect.top - 48}px`;
+                  if (rect.width === 0 && rect.height === 0) return;
 
-            // Центрируем с защитой от вылета за границы экрана смартфона
-            let leftPos = window.scrollX + rect.left + (rect.width / 2) - 65;
-            leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - 140));
-            tooltip.style.left = `${leftPos}px`;
+                  tooltip.style.display = "block";
+
+                  // Расчет позиции с учетом прокрутки страницы на iOS
+                  const topPos = window.pageYOffset + rect.top - 48;
+                  let leftPos = window.pageXOffset + rect.left + (rect.width / 2) - 75;
+
+                  // Защита от вылета за левый и правый край экрана телефона
+                  leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - 160));
+
+                  tooltip.style.top = `${topPos}px`;
+                  tooltip.style.left = `${leftPos}px`;
+            } catch (e) {
+                  console.error("Ошибка позиционирования тултипа:", e);
+            }
       } else {
+            hideSelectionTooltip();
+      }
+}
+
+// 1. Слушатель для iOS: selectionchange отслеживает смещение пинов выделения
+document.addEventListener("selectionchange", () => {
+      clearTimeout(selectionTimeout);
+      selectionTimeout = setTimeout(() => {
+            checkAndShowSelectionTooltip();
+      }, 200); // Небольшая задержка, чтобы юзер закончил двигать лупу
+});
+
+// 2. Слушатели для ПК и Android
+document.addEventListener("mouseup", () => {
+      setTimeout(checkAndShowSelectionTooltip, 50);
+});
+
+// 3. Закрытие тултипа при тапе вне его зоны
+document.addEventListener("touchstart", (e) => {
+      if (!e.target.closest("#selectionTooltip")) {
+            // Не прячем сразу, если тап был по выделяемому тексту
+      }
+}, { passive: true });
+
+document.addEventListener("mousedown", (e) => {
+      if (!e.target.closest("#selectionTooltip")) {
             hideSelectionTooltip();
       }
 });
