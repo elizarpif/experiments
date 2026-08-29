@@ -8,14 +8,21 @@ from ebooklib import epub
 SLUG = "94231--rezero-kara-hajimeru-isekai-seikatsu-outo-no-ichinichi-hen"
 BOOK_URL = f"https://ranobelib.me/ru/book/{SLUG}?section=chapters"
 
-EPUB_TITLE = "Re:Zero — Тома 29-30"
+NOVEL_NAME = "ReZero"
 EPUB_AUTHOR = "Tappei Nagatsuki"
-OUTPUT_FILE = "ReZero_Vol29_30.epub"
 
 # Фильтрация
-START_VOL = 29
-END_VOL = 30
-START_CHAPTER = 41
+START_VOL = 31
+END_VOL = 31
+START_CHAPTER = None  # Оставьте None, чтобы скачивать с первой главы стартового тома
+
+# Автоматическая генерация названий
+if START_VOL == END_VOL:
+    EPUB_TITLE = f"{NOVEL_NAME} — Том {START_VOL}"
+    OUTPUT_FILE = f"{NOVEL_NAME}_Vol{START_VOL}.epub"
+else:
+    EPUB_TITLE = f"{NOVEL_NAME} — Тома {START_VOL}-{END_VOL}"
+    OUTPUT_FILE = f"{NOVEL_NAME}_Vol{START_VOL}-{END_VOL}.epub"
 
 DELAY_MIN = 2.0
 DELAY_MAX = 4.0
@@ -64,19 +71,6 @@ def format_chapter_html(title: str, text_content: str) -> str:
 </body>
 </html>"""
 
-# def handle_age_modal(page):
-#     """Закрывает окно подтверждения 18+."""
-#     try:
-#         # Убрали 'Войти', добавили специфичные для 18+ тексты
-#         btn = page.locator("button:has-text('18'), button:has-text('Мне есть 18'), button:has-text('Да, мне есть 18')")
-#         for i in range(btn.count()):
-#             if btn.nth(i).is_visible(timeout=1000):
-#                 print("Нажимаем подтверждение 18+...")
-#                 btn.nth(i).click()
-#                 time.sleep(1.5)
-#                 break
-#     except Exception:
-#         pass
 def handle_age_modal(page):
     """Закрывает окно подтверждения 18+ и ставит галочку 'Больше не показывать'."""
     try:
@@ -103,7 +97,7 @@ def collect_all_chapters_via_dom(page):
     chapters_dict = {}
     last_count = 0
     unchanged_steps = 0
-    max_scrolls = 150 # Увеличили количество скроллов для больших списков
+    max_scrolls = 150
 
     print("Начинаем сканирование списка глав скроллом...")
     
@@ -185,7 +179,8 @@ def run():
             num = ch["ch"]
 
             if START_VOL <= vol <= END_VOL:
-                if vol == START_VOL and num < START_CHAPTER:
+                # Если START_CHAPTER задан, отсекаем ранние главы в первом томе
+                if START_CHAPTER is not None and vol == START_VOL and num < START_CHAPTER:
                     continue
                 target_chapters.append(ch)
 
