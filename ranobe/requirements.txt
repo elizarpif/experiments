@@ -1,0 +1,2 @@
+ebooklib==0.20
+playwright==1.62.0
