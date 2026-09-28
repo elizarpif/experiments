@@ -41,7 +41,13 @@ app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
 app.include_router(auth_router)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def _static_file(name: str, media_type: str) -> FileResponse:
+    path = STATIC_DIR / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path, media_type=media_type)
 
 
 # --- Pydantic Схемы ---
@@ -84,13 +90,16 @@ def get_ui():
 
 
 @app.get("/style.css")
-def legacy_style_css():
-    return FileResponse(STATIC_DIR / "style.css", media_type="text/css")
+def root_style_css():
+    return _static_file("style.css", "text/css")
 
 
 @app.get("/app.js")
-def legacy_app_js():
-    return FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
+def root_app_js():
+    return _static_file("app.js", "application/javascript")
+
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 # --- API Эндпоинты ---
