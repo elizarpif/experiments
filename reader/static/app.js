@@ -17,6 +17,52 @@ function detectTelegramMiniApp() {
       return Boolean(tg && tg.initData);
 }
 
+function showModal(el) {
+      if (!el) return;
+      el.hidden = false;
+      el.classList.add("is-open");
+}
+
+function hideModal(el) {
+      if (!el) return;
+      el.classList.remove("is-open");
+      el.hidden = true;
+}
+
+function applyTelegramChrome() {
+      const tg = getTelegramWebApp();
+      if (!tg) return;
+
+      tg.ready();
+      tg.expand();
+
+      if (typeof tg.disableVerticalSwipes === "function") {
+            tg.disableVerticalSwipes();
+      }
+
+      const p = tg.themeParams || {};
+      const root = document.documentElement;
+      if (p.bg_color) {
+            root.style.setProperty("--bg-app", p.bg_color);
+            document.body.style.background = p.bg_color;
+            if (typeof tg.setBackgroundColor === "function") tg.setBackgroundColor(p.bg_color);
+            if (typeof tg.setHeaderColor === "function") tg.setHeaderColor(p.bg_color);
+      }
+      if (p.secondary_bg_color) root.style.setProperty("--bg-card", p.secondary_bg_color);
+      if (p.text_color) root.style.setProperty("--text-main", p.text_color);
+      if (p.hint_color) root.style.setProperty("--text-muted", p.hint_color);
+      if (p.button_color) root.style.setProperty("--primary", p.button_color);
+
+      if (tg.viewportStableHeight) {
+            root.style.setProperty("--tg-viewport-stable-height", `${tg.viewportStableHeight}px`);
+      }
+      tg.onEvent("viewportChanged", () => {
+            if (tg.viewportStableHeight) {
+                  root.style.setProperty("--tg-viewport-stable-height", `${tg.viewportStableHeight}px`);
+            }
+      });
+}
+
 async function loginWithTelegram() {
       const tg = getTelegramWebApp();
       if (!tg || !tg.initData) return false;
@@ -52,6 +98,15 @@ async function apiFetch(url, options = {}) {
       const res = await fetch(url, options);
 
       if (res.status === 401) {
+            if (isTelegramMiniApp) {
+                  try {
+                        await loginWithTelegram();
+                        options.headers["Authorization"] = `Bearer ${authToken}`;
+                        return fetch(url, options);
+                  } catch (_) {
+                        throw new Error("Не удалось авторизоваться через Telegram");
+                  }
+            }
             logout();
             throw new Error("Требуется авторизация");
       }
@@ -70,7 +125,7 @@ function checkAuthUI() {
       }
 
       if (isTelegramMiniApp) {
-            if (modal) modal.style.display = "none";
+            hideModal(modal);
             if (btnToggleAuth) btnToggleAuth.style.display = "none";
             if (authBtn) authBtn.innerText = "Закрыть";
             if (userLabel) {
@@ -82,11 +137,11 @@ function checkAuthUI() {
       }
 
       if (authToken && currentUsername) {
-            if (modal) modal.style.display = "none";
+            hideModal(modal);
             if (userLabel) userLabel.innerText = `👤 ${currentDisplayName || currentUsername}`;
             if (authBtn) authBtn.innerText = "Выйти";
       } else {
-            if (modal) modal.style.display = "flex";
+            showModal(modal);
             if (userLabel) userLabel.innerText = "";
             if (authBtn) authBtn.innerText = "Войти";
       }
@@ -185,8 +240,7 @@ function handleAuthButtonClick() {
       if (authToken) {
             logout();
       } else {
-            const modal = document.getElementById("authModal");
-            if (modal) modal.style.display = "flex";
+            showModal(document.getElementById("authModal"));
       }
 }
 
@@ -827,9 +881,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       isTelegramMiniApp = detectTelegramMiniApp();
       if (isTelegramMiniApp) {
             document.body.classList.add("telegram-mini-app");
-            const tg = getTelegramWebApp();
-            tg.ready();
-            tg.expand();
+            applyTelegramChrome();
             try {
                   await loginWithTelegram();
             } catch (e) {
@@ -854,32 +906,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // auth modal
 function openAuthModal() {
-      const modal = document.getElementById("authModal");
-      if (modal) modal.style.display = "flex";
+      showModal(document.getElementById("authModal"));
 }
 
 function closeAuthModal() {
-      const modal = document.getElementById("authModal");
-      if (modal) modal.style.display = "none";
+      hideModal(document.getElementById("authModal"));
 }
 
 // modal for gemini key
 
 function openApiKeyModal() {
       const modal = document.getElementById("apiKeyModal");
-      if (modal) {
-            modal.style.display = "flex";
-            document.getElementById("inputApiKey").value = "";
-            document.getElementById("inputApiKey").focus();
-      }
+      showModal(modal);
+      document.getElementById("inputApiKey").value = "";
+      document.getElementById("inputApiKey").focus();
 }
 
 function closeApiKeyModal() {
-      const modal = document.getElementById("apiKeyModal");
-      if (modal) {
-            modal.style.display = "none";
-            document.getElementById("inputApiKey").value = "";
-      }
+      hideModal(document.getElementById("apiKeyModal"));
+      document.getElementById("inputApiKey").value = "";
 }
 
 async function saveApiKey() {

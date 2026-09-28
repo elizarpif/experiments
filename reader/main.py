@@ -83,6 +83,16 @@ def get_ui():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/style.css")
+def legacy_style_css():
+    return FileResponse(STATIC_DIR / "style.css", media_type="text/css")
+
+
+@app.get("/app.js")
+def legacy_app_js():
+    return FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
+
+
 # --- API Эндпоинты ---
 
 @app.post("/api/analyze")

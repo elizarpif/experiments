@@ -502,9 +502,17 @@ th {
       inset: 0;
       background: rgba(15, 23, 42, 0.5);
       z-index: 2000;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
+}
+
+.modal-overlay.is-open {
+      display: flex;
+}
+
+.modal-overlay[hidden] {
+      display: none !important;
 }
 
 .modal-box {
@@ -545,6 +553,22 @@ th {
       font-size: 13px;
       padding: 8px 14px;
       border-radius: 20px;
+}
+
+/* Telegram Mini App */
+body.telegram-mini-app {
+      max-width: none;
+      padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
+      min-height: var(--tg-viewport-stable-height, 100vh);
+      -webkit-text-size-adjust: 100%;
+}
+
+body.telegram-mini-app .btn,
+body.telegram-mini-app .tab-btn,
+body.telegram-mini-app .seg-btn {
+      touch-action: manipulation;
+      cursor: pointer;
 }
 
 /* 9. Mobile Responsiveness */
