@@ -4,7 +4,42 @@
 
 let authToken = sessionStorage.getItem("auth_token") || null;
 let currentUsername = sessionStorage.getItem("auth_user") || null;
+let currentDisplayName = sessionStorage.getItem("auth_display") || null;
 let isRegisterMode = false;
+let isTelegramMiniApp = false;
+
+function getTelegramWebApp() {
+      return window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+}
+
+function detectTelegramMiniApp() {
+      const tg = getTelegramWebApp();
+      return Boolean(tg && tg.initData);
+}
+
+async function loginWithTelegram() {
+      const tg = getTelegramWebApp();
+      if (!tg || !tg.initData) return false;
+
+      const res = await fetch("/api/auth/telegram", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: tg.initData }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+            throw new Error(data.detail || "Не удалось войти через Telegram");
+      }
+
+      authToken = data.access_token;
+      currentUsername = data.username;
+      currentDisplayName = data.display_name || data.username;
+      sessionStorage.setItem("auth_token", authToken);
+      sessionStorage.setItem("auth_user", currentUsername);
+      sessionStorage.setItem("auth_display", currentDisplayName);
+      return true;
+}
 
 // Универсальная обертка для fetch с авторизацией
 async function apiFetch(url, options = {}) {
@@ -28,13 +63,27 @@ function checkAuthUI() {
       const userLabel = document.getElementById("displayUsername");
       const authBtn = document.getElementById("btnAuthAction");
       const btnSettings = document.getElementById("btnSettings");
+      const btnToggleAuth = document.getElementById("btnToggleAuthMode");
+
       if (btnSettings) {
             btnSettings.style.display = (authToken && currentUsername) ? "inline-block" : "none";
       }
 
+      if (isTelegramMiniApp) {
+            if (modal) modal.style.display = "none";
+            if (btnToggleAuth) btnToggleAuth.style.display = "none";
+            if (authBtn) authBtn.innerText = "Закрыть";
+            if (userLabel) {
+                  userLabel.innerText = authToken
+                        ? `👤 ${currentDisplayName || currentUsername}`
+                        : "⏳ Вход через Telegram…";
+            }
+            return;
+      }
+
       if (authToken && currentUsername) {
             if (modal) modal.style.display = "none";
-            if (userLabel) userLabel.innerText = `👤 ${currentUsername}`;
+            if (userLabel) userLabel.innerText = `👤 ${currentDisplayName || currentUsername}`;
             if (authBtn) authBtn.innerText = "Выйти";
       } else {
             if (modal) modal.style.display = "flex";
@@ -87,8 +136,10 @@ async function submitAuthForm() {
 
             authToken = data.access_token;
             currentUsername = data.username || username;
+            currentDisplayName = data.display_name || currentUsername;
             sessionStorage.setItem("auth_token", authToken);
             sessionStorage.setItem("auth_user", currentUsername);
+            sessionStorage.setItem("auth_display", currentDisplayName);
 
             checkAuthUI();
             loadSourcesList();
@@ -101,8 +152,10 @@ async function submitAuthForm() {
 function logout() {
       authToken = null;
       currentUsername = null;
+      currentDisplayName = null;
       sessionStorage.removeItem("auth_token");
       sessionStorage.removeItem("auth_user");
+      sessionStorage.removeItem("auth_display");
 
       // Сбрасываем таблицы и счетчики
       const tbody = document.getElementById("vocabTableBody");
@@ -124,6 +177,11 @@ function logout() {
 }
 
 function handleAuthButtonClick() {
+      if (isTelegramMiniApp) {
+            const tg = getTelegramWebApp();
+            if (tg) tg.close();
+            return;
+      }
       if (authToken) {
             logout();
       } else {
@@ -765,7 +823,20 @@ function escapeId(str) { return encodeURIComponent(str).replace(/%/g, '_'); }
 // ЕДИНАЯ ТОЧКА СТАРТА ПРИЛОЖЕНИЯ
 // ====================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+      isTelegramMiniApp = detectTelegramMiniApp();
+      if (isTelegramMiniApp) {
+            document.body.classList.add("telegram-mini-app");
+            const tg = getTelegramWebApp();
+            tg.ready();
+            tg.expand();
+            try {
+                  await loginWithTelegram();
+            } catch (e) {
+                  alert(e.message || "Ошибка входа через Telegram");
+            }
+      }
+
       checkAuthUI();
 
       const savedLang = localStorage.getItem("last_selected_lang");
@@ -779,6 +850,18 @@ document.addEventListener("DOMContentLoaded", () => {
             updateDictBadgeCount();
       }
 });
+
+
+// auth modal
+function openAuthModal() {
+      const modal = document.getElementById("authModal");
+      if (modal) modal.style.display = "flex";
+}
+
+function closeAuthModal() {
+      const modal = document.getElementById("authModal");
+      if (modal) modal.style.display = "none";
+}
 
 // modal for gemini key
 

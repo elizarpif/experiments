@@ -32,6 +32,11 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     username: str
+    display_name: str | None = None
+
+
+class TelegramAuthRequest(BaseModel):
+    init_data: str
 
 
 # --- Вспомогательные функции хеширования ---
@@ -109,7 +114,49 @@ def register(data: UserAuthSchema):
     create_user(username, hashed_pw)
 
     token = create_access_token(data={"sub": username})
-    return {"access_token": token, "token_type": "bearer", "username": username}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": username,
+        "display_name": username,
+    }
+
+
+@router.post("/telegram", response_model=TokenResponse)
+def login_telegram(data: TelegramAuthRequest):
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TELEGRAM_BOT_TOKEN не задан на сервере",
+        )
+
+    from telegram_auth import TelegramAuthError, validate_telegram_init_data
+
+    try:
+        tg_user = validate_telegram_init_data(data.init_data.strip(), bot_token)
+    except TelegramAuthError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    telegram_id = int(tg_user["id"])
+    username = f"tg_{telegram_id}"
+
+    if not get_user_by_username(username):
+        create_user(username, get_password_hash(secrets.token_hex(32)))
+
+    display_name = tg_user.get("first_name") or username
+    if tg_user.get("username"):
+        display_name = f"@{tg_user['username']}"
+    elif tg_user.get("last_name"):
+        display_name = f"{tg_user.get('first_name', '')} {tg_user['last_name']}".strip()
+
+    token = create_access_token(data={"sub": username})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": username,
+        "display_name": display_name,
+    }
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -124,7 +171,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
 
     token = create_access_token(data={"sub": user["username"]})
-    return {"access_token": token, "token_type": "bearer", "username": user["username"]}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user["username"],
+        "display_name": user["username"],
+    }
 
 from database import create_user, get_user_by_username, update_user_api_key, get_user_api_key
 
