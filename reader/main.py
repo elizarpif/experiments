@@ -5,15 +5,23 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from argostranslate import package, translate
+import logging
+from groq import Groq
+
+from nlp_service import MultilingualNLPService
+
+from auth import get_current_user, router as auth_router
+
 
 load_dotenv()
 
-from auth import get_current_user, router as auth_router
+
 from database import (
     delete_item_by_id,
     get_all_user_items,
@@ -24,20 +32,63 @@ from database import (
     save_or_update_item,
     update_status_by_id,
 )
-from nlp_service import MultilingualNLPService
+
 
 nlp_service = None
 
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("uvicorn.error")
+
+def ensure_argos_package(from_code: str, to_code: str):
+    """Проверяет наличие пары языков и устанавливает её при отсутствии."""
+    installed_langs = translate.get_installed_languages()
+    from_lang = next((l for l in installed_langs if l.code == from_code), None)
+    to_lang = next((l for l in installed_langs if l.code == to_code), None)
+
+    # Если оба языка уже стоят и между ними есть связка перевода
+    if from_lang and to_lang and from_lang.get_translation(to_lang):
+        logger.info(f"Языковой пакет Argos {from_code} -> {to_code} уже установлен.")
+        return
+
+    logger.info(f"Загрузка индекса пакетов Argos для {from_code} -> {to_code}...")
+    package.update_package_index()
+    available_packages = package.get_available_packages()
+
+    target_pkg = next(
+        (pkg for pkg in available_packages if pkg.from_code == from_code and pkg.to_code == to_code),
+        None
+    )
+
+    if not target_pkg:
+        logger.warning(f"Пакет {from_code} -> {to_code} не найден в официальном репозитории Argos.")
+        return
+
+    logger.info(f"Скачивание и установка {from_code} -> {to_code}...")
+    download_path = target_pkg.download()
+    package.install_from_path(download_path)
+    logger.info(f"Пакет {from_code} -> {to_code} успешно установлен.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global nlp_service
     init_db()
     nlp_service = MultilingualNLPService()
-    yield
 
+    # Код, выполняемый ПЕРЕД запуском приложения
+    logger.info("Проверка языковых моделей Argos Translate при старте...")
+    try:
+        ensure_argos_package("en", "ru")
+        ensure_argos_package("es", "en")
+    except Exception as e:
+        logger.error(f"Ошибка загрузки пакетов Argos: {e}")
+    
+    yield  # Здесь приложение начинает принимать входящие запросы
+    
+    # Код при выключении приложения (если нужен)
 
-app = FastAPI(title="Spanish Lexical Hub", lifespan=lifespan)
+# Инициализируем FastAPI с lifespan
+app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -55,7 +106,6 @@ def _static_file(name: str, media_type: str) -> FileResponse:
 class AnalyzeRequest(BaseModel):
     text: str
     language: str = "es"
-
 
 class ExplainRequest(BaseModel):
     text: str
@@ -130,13 +180,10 @@ def explain_text(
     if not user_key:
         raise HTTPException(
             status_code=400,
-            detail="API-ключ Gemini не найден. Пожалуйста, укажите ваш личный ключ в настройках профиля (⚙️ API Ключ)."
+            detail="API-ключ Groq не найден. Пожалуйста, укажите ваш личный ключ в настройках профиля (⚙️ API Ключ)."
         )
 
-    client = OpenAI(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-        api_key=user_key
-    )
+    client = Groq(api_key=user_key)
 
     term = payload.text.strip()
     sentence = payload.sentence.strip() if payload.sentence else ""
@@ -171,7 +218,7 @@ def explain_text(
 
     try:
         response = client.chat.completions.create(
-            model="gemini-3.5-flash-lite",
+            model="openai/gpt-oss-120b",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -194,9 +241,52 @@ def explain_text(
 
         return ExplainResponse(translation=translation, breakdown=breakdown)
     except Exception as e:
-        return ExplainResponse(translation=f"Ошибка Gemini API: {e}", breakdown="")
+        return ExplainResponse(translation=f"Ошибка Groq: {e}", breakdown="")
 
 
+
+# Схема запроса с ограничением длины
+class TranslateRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    from_lang: str = Field(default="en", max_length=5)
+    to_lang: str = Field(default="ru", max_length=5)
+
+@app.post("/api/translate")
+def translate_text(
+    payload: TranslateRequest,
+    current_user: str = Depends(get_current_user)
+):
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Текст пуст")
+
+    installed_langs = translate.get_installed_languages()
+    from_lang_obj = next((l for l in installed_langs if l.code == payload.from_lang), None)
+    to_lang_obj = next((l for l in installed_langs if l.code == payload.to_lang), None)
+
+    if not from_lang_obj or not to_lang_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Языковая пара {payload.from_lang}->{payload.to_lang} не установлена на сервере"
+        )
+
+    translation = from_lang_obj.get_translation(to_lang_obj)
+    if not translation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Прямой перевод {payload.from_lang}->{payload.to_lang} недоступен"
+        )
+
+    try:
+        result = translation.translate(text)
+        return {
+            "translated_text": result,
+            "breakdown": ""
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка перевода: {str(e)}")
+
+    
 @app.post("/api/vocab/save")
 def save_vocabulary_item(
     payload: SaveItemRequest,

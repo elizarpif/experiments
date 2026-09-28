@@ -382,6 +382,7 @@ function renderList(containerId, items, type) {
                 </div>
             </div>
             <div class="btn-group">
+                <button class="btn btn-translate" onclick="translateItem('${escapeJs(termValue)}', '${safeId}')">🔤 Перевод</button>
                 <button class="btn btn-translate" onclick="explainItem('${escapeJs(termValue)}', '${escapeJs(lemmaValue)}', '${escapeJs(sentenceValue)}', '${safeId}', '${type}')">🌐 Разбор LLM</button>
                 <button class="btn ${isTracked ? 'btn-known' : 'btn-learn'}" onclick="saveWord('${type}', '${escapeJs(termValue)}', '${escapeJs(lemmaValue)}', '${escapeJs(sentenceValue)}', 'learning', '${safeId}', this)">
                     ${isTracked ? 'В словарь (учу)' : '➕ В словарь'}
@@ -390,6 +391,55 @@ function renderList(containerId, items, type) {
             </div>
         </div>`;
       }).join("");
+}
+
+async function translateItem(text, safeId) {
+      console.log("translateItem вызван для:", text, safeId);
+      const boxDiv = document.getElementById("box-" + safeId);
+      const transDiv = document.getElementById("trans-" + safeId);
+
+      // Определяем язык (по умолчанию en)
+      const langEl = document.getElementById("readerLanguage");
+      const breakDiv = document.getElementById("break-" + safeId);
+      const lang = langEl ? langEl.value : "en";
+
+      if (boxDiv) {
+            boxDiv.style.display = "flex";
+      }
+      if (transDiv) {
+            transDiv.innerText = "⏳ Переводим через Argos...";
+      }
+      if (breakDiv) breakDiv.style.display = "none";
+
+      try {
+            const res = await apiFetch("/api/translate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                        text: text,
+                        from_lang: lang,
+                        to_lang: "ru"
+                  })
+            });
+
+            const data = await res.json();
+            console.log("Ответ от сервера:", data);
+
+            if (!res.ok) {
+                  throw new Error(data.detail || `Ошибка ${res.status}`);
+            }
+
+            const translation = data.translated_text || "Перевод не найден";
+            if (transDiv) {
+                  transDiv.innerText = "🇷🇺 " + translation;
+                  transDiv.dataset.translation = translation;
+            }
+      } catch (e) {
+            console.error("Ошибка перевода:", e);
+            if (transDiv) {
+                  transDiv.innerText = "⚠️ Ошибка: " + e.message;
+            }
+      }
 }
 
 async function explainItem(term, lemma, sentence, safeId, itemType) {
@@ -500,34 +550,62 @@ async function handleManualSelection() {
       if (manualSection) manualSection.style.display = "block";
 
       const container = document.getElementById("manualList");
+      if (!container) return;
+
       const safeId = escapeId("manual_" + term + "_" + Date.now());
 
-      const cardHtml = `
-    <div class="card" id="card-${safeId}" style="border-left: 4px solid var(--primary);">
+      // Создаем DOM-элемент карточки
+      const card = document.createElement("div");
+      card.className = "card";
+      card.id = `card-${safeId}`;
+      card.style.borderLeft = "4px solid var(--primary)";
+
+      card.innerHTML = `
         <div class="card-content">
             <div class="card-header">
-                <span class="word-title">${term.toUpperCase()}</span>
+                <span class="word-title"></span>
                 <span class="tag tag-gray">${isPhrase ? 'Фраза (выбор)' : 'Слово (выбор)'}</span>
             </div>
-            <div class="context">"${sentence}"</div>
+            <div class="context"></div>
             
             <div class="llm-result-box" id="box-${safeId}" style="display: flex;">
-                <div class="translation-text" id="trans-${safeId}">⏳ Разбираем...</div>
+                <div class="translation-text" id="trans-${safeId}">⏳ Выберите действие...</div>
                 <div class="breakdown-text" id="break-${safeId}" style="display:none;"></div>
             </div>
         </div>
         <div class="btn-group">
-            <button class="btn btn-learn" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'learning', '${safeId}', this)">
-                ➕ В словарь
-            </button>
-            <button class="btn btn-known" onclick="saveWord('${itemType}', '${escapeJs(term)}', '${escapeJs(term)}', '${escapeJs(sentence)}', 'known', '${safeId}', this)">
-                ✓ Знаю
-            </button>
+            <button class="btn btn-translate" id="btn-trans-${safeId}">🔤 Перевод</button>
+            <button class="btn btn-translate" id="btn-llm-${safeId}">🌐 Разбор LLM</button>
+            <button class="btn btn-learn" id="btn-save-learn-${safeId}">➕ В словарь</button>
+            <button class="btn btn-known" id="btn-save-known-${safeId}">✓ Знаю</button>
         </div>
-    </div>`;
+      `;
 
-      if (container) container.insertAdjacentHTML("afterbegin", cardHtml);
-      explainItem(term, term, sentence, safeId, itemType);
+      // Безопасно вставляем текст (защита от сломанных кавычек и XSS)
+      card.querySelector(".word-title").textContent = term.toUpperCase();
+      card.querySelector(".context").textContent = `"${sentence}"`;
+
+      // Добавляем карточку в начало списка
+      container.prepend(card);
+
+      // Привязываем обработчики событий напрямую к кнопкам
+      document.getElementById(`btn-trans-${safeId}`).addEventListener("click", () => {
+            translateItem(term, safeId);
+      });
+
+      document.getElementById(`btn-llm-${safeId}`).addEventListener("click", () => {
+            explainItem(term, term, sentence, safeId, itemType);
+      });
+
+      const btnLearn = document.getElementById(`btn-save-learn-${safeId}`);
+      btnLearn.addEventListener("click", () => {
+            saveWord(itemType, term, term, sentence, 'learning', safeId, btnLearn);
+      });
+
+      const btnKnown = document.getElementById(`btn-save-known-${safeId}`);
+      btnKnown.addEventListener("click", () => {
+            saveWord(itemType, term, term, sentence, 'known', safeId, btnKnown);
+      });
 }
 
 // ====================================================
@@ -535,6 +613,13 @@ async function handleManualSelection() {
 // ====================================================
 
 let selectionTimeout = null;
+
+function hideSelectionTooltip() {
+      const tooltip = document.getElementById("selectionTooltip");
+      if (tooltip) {
+            tooltip.style.display = "none";
+      }
+}
 
 function checkAndShowSelectionTooltip() {
       const readArea = document.getElementById("readArea");
@@ -545,39 +630,42 @@ function checkAndShowSelectionTooltip() {
       }
 
       const selection = window.getSelection();
-      if (!selection || selection.isCollapsed) {
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
             hideSelectionTooltip();
             return;
       }
 
       const text = selection.toString().trim();
 
-      // Проверяем, что выделенный текст находится именно внутри зоны чтения
-      if (!readArea.contains(selection.anchorNode)) {
+      // Проверяем, что выделение пересекает контейнер чтения
+      const range = selection.getRangeAt(0);
+      const isInsideReadArea = readArea.contains(range.commonAncestorContainer) ||
+            readArea.contains(selection.anchorNode) ||
+            readArea.contains(selection.focusNode);
+
+      if (!isInsideReadArea) {
             hideSelectionTooltip();
             return;
       }
 
-      if (text.length >= 2 && text.length <= 120) {
+      if (text.length >= 2 && text.length <= 3000) {
             currentSelectedText = text;
             currentSelectedSentence = extractSurroundingSentence(selection, text);
 
             try {
-                  const range = selection.getRangeAt(0);
                   const rect = range.getBoundingClientRect();
-
                   if (rect.width === 0 && rect.height === 0) return;
 
                   tooltip.style.display = "block";
 
-                  // Расчет позиции с учетом прокрутки страницы на iOS
+                  // Расчет позиции с учетом прокрутки страницы
                   const topPos = window.pageYOffset + rect.top - 48;
-                  let leftPos = window.pageXOffset + rect.left + (rect.width / 2) - 75;
+                  let leftPos = window.pageXOffset + rect.left + (rect.width / 2) - (tooltip.offsetWidth || 150) / 2;
 
-                  // Защита от вылета за левый и правый край экрана телефона
-                  leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - 160));
+                  // Ограничители по краям экрана
+                  leftPos = Math.max(10, Math.min(leftPos, window.innerWidth - 170));
 
-                  tooltip.style.top = `${topPos}px`;
+                  tooltip.style.top = `${Math.max(10, topPos)}px`;
                   tooltip.style.left = `${leftPos}px`;
             } catch (e) {
                   console.error("Ошибка позиционирования тултипа:", e);
@@ -587,28 +675,36 @@ function checkAndShowSelectionTooltip() {
       }
 }
 
-// 1. Слушатель для iOS: selectionchange отслеживает смещение пинов выделения
+// 1. Отслеживание изменения диапазона (iOS и смещение маркеров)
 document.addEventListener("selectionchange", () => {
       clearTimeout(selectionTimeout);
       selectionTimeout = setTimeout(() => {
             checkAndShowSelectionTooltip();
-      }, 200); // Небольшая задержка, чтобы юзер закончил двигать лупу
+      }, 150);
 });
 
-// 2. Слушатели для ПК и Android
+// 2. Отпускание мыши / пальца
 document.addEventListener("mouseup", () => {
-      setTimeout(checkAndShowSelectionTooltip, 50);
+      setTimeout(checkAndShowSelectionTooltip, 30);
 });
 
-// 3. Закрытие тултипа при тапе вне его зоны
-document.addEventListener("touchstart", (e) => {
-      if (!e.target.closest("#selectionTooltip")) {
-            // Не прячем сразу, если тап был по выделяемому тексту
-      }
-}, { passive: true });
+document.addEventListener("touchend", () => {
+      setTimeout(checkAndShowSelectionTooltip, 100);
+});
 
+// 3. Закрытие тултипа: закрываем ТОЛЬКО если клик произошел мимо тултипа И мимо зоны чтения
 document.addEventListener("mousedown", (e) => {
-      if (!e.target.closest("#selectionTooltip")) {
+      const tooltip = document.getElementById("selectionTooltip");
+      const readArea = document.getElementById("readArea");
+
+      // Если кликнули внутрь тултипа — не сбрасываем выделение
+      if (tooltip && tooltip.contains(e.target)) {
+            e.preventDefault(); // Не дает браузеру сбросить selection до выполнения click
+            return;
+      }
+
+      // Если кликнули вне зоны чтения — прячем тултип
+      if (readArea && !readArea.contains(e.target)) {
             hideSelectionTooltip();
       }
 });
@@ -625,7 +721,6 @@ function extractSurroundingSentence(selection, term) {
             return term;
       }
 }
-
 
 // ====================================================
 // СЛОВАРЬ И ПАГИНАЦИЯ
@@ -847,15 +942,42 @@ function toggleNewSourceMode() {
       const select = document.getElementById("readerSourceSelect");
       const btn = document.getElementById("btnToggleNewSource");
 
-      if (input.style.display === "none") {
+      if (input.style.display === "none" || !input.style.display) {
             input.style.display = "inline-block";
             select.style.display = "none";
-            btn.innerText = "✕ Выбрать из списка";
+            btn.innerText = "✕";
             input.focus();
+
+            // Обработка клавиши Enter при вводе названия
+            input.onkeydown = function (e) {
+                  if (e.key === "Enter") {
+                        e.preventDefault();
+                        const val = input.value.trim();
+                        if (!val) return;
+
+                        // Добавляем книгу в список, если её там ещё нет
+                        let exists = Array.from(select.options).some(opt => opt.value.toLowerCase() === val.toLowerCase());
+                        if (!exists) {
+                              const newOpt = document.createElement("option");
+                              newOpt.value = val;
+                              newOpt.textContent = val;
+                              select.appendChild(newOpt);
+                        }
+
+                        select.value = val;
+                        localStorage.setItem("last_selected_source", val);
+
+                        // Возвращаем селект обратно
+                        input.value = "";
+                        input.style.display = "none";
+                        select.style.display = "inline-block";
+                        btn.innerText = "+";
+                  }
+            };
       } else {
             input.style.display = "none";
             select.style.display = "inline-block";
-            btn.innerText = "+ Новая книга";
+            btn.innerText = "+";
       }
 }
 
@@ -869,7 +991,14 @@ function onLanguageChange() {
       localStorage.setItem("last_selected_lang", val);
 }
 
-function escapeJs(str) { return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+function escapeJs(str) {
+      if (!str) return '';
+      return String(str)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\x27")
+            .replace(/"/g, '&quot;')
+            .replace(/\n/g, ' ');
+}
 function escapeId(str) { return encodeURIComponent(str).replace(/%/g, '_'); }
 
 
